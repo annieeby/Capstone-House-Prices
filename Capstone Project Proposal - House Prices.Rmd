@@ -1,0 +1,31 @@
+---
+title: "Capstone Project Proposal"
+author: "Annie Eby"
+date: "11/27/2018"
+output: html_document
+---
+
+
+
+
+### Abstract
+
+This project will create an algorithm that, using a set of 79 parameters, determines the predicted sale price of a house. By applying regression models to these parameters, we can calculate house valuations in a given geographical area. This project comes from the Kaggle Competition called [House Prices: Advanced Regression Techniques](https://www.kaggle.com/c/house-prices-advanced-regression-techniques).
+
+
+### Problem Setup
+
+Housing price prediction provides valuable information. More than ensuring buyers, sellers, and real estate professionals negotiate a fair price, price analysis can help city officials determine how variables like public infrastructure and services affect home prices and thereby plan projects appropriately. Knowing which variables most impact the cost of housing can help planning and zoning departments make decisions that keep property prices stable or make provisions to encourage certain kinds of development. 
+
+### Data
+
+House pricing predictions will be made from 1460 observations of 79 explanatory variables describing aspects of residential homes in Ames, Iowa. The [Ames Housing Dataset](https://www.kaggle.com/c/house-prices-advanced-regression-techniques/data) using was compiled by Dean De Cock for use in data science education; it is a modernized and expanded version of the often cited Boston Housing dataset. 
+
+### Analysis Approach
+
+The analysis will include feature engineering and advanced regression techniques like random forest and gradient boosting. Regression is a machine learning tool that helps you make predictions by learning – from the existing statistical data – the relationships between the target parameter, the sale price, and a set of other parameters. Given enough data, the relationship between the target parameter of sale price (the output) and other parameters (the input), this relationship function can be applied to the test data to predict sale prices.
+
+### Deliverables
+
+The primary deliverables are the code used to execute the analysis and predict the house prices. I will also deliver a paper which will communicate the analysis process and the findings. The paper will be targeted for real estate professionals and city officials in Ames, Iowa. All final deliverables, as well as intermediate deliverables, will be made available on the project's [GitHub Repository](https://github.com/annieeby/Capstone-House-Prices).
+
