@@ -11,7 +11,7 @@
 
 # load libraries using pacman to make the file more easily shareable
 if(!require(pacman)){install.packages('pacman')}
-pacman::p_load(dplyr, tidyr, ggplot2, caret,randomForest, rpart, 
+pacman::p_load(dplyr, tidyr, purrr, ggplot2, caret,randomForest, rpart, 
                rpart.plot, RColorBrewer, rattle, party, Hmisc, mlr, data.table)
 
 
@@ -45,13 +45,6 @@ summary(train)
 head(train)
 
 # note: data is already tidy with all columns as variables (contains all values that measure the same attribute across units) and all rows as observations (contains all values measured on the same unit across attributes); one type of observational unit per table
-# because data is tidy, we do not need to rearrange rows and columns using gather() or spread()
-# separate(dataset, name of colum to separate, c('new column', 'new column'), sep); unite() does reverse: unite(data, 'new column', ...[selected columns], sep = _)
-
-# Ideas to tidy:
-# separate: BldgType, HouseStyle
-# make variables into binary variables?
-# Make 'Gd' values numeric (in ExterQual, BsmtQual)
 
 ##################################################################################
 ################################ INITIAL INSIGHTS ################################ 
@@ -64,6 +57,16 @@ boxplot(train$SalePrice, horizontal = TRUE) #outliers are anything above $350K
 hist(train$SalePrice, breaks = 50) # most houses $150 - $200K
 plot(train$SalePrice, main="SalePrice", sub="Full Training Data Set",
      xlab="Observations", ylab="Price") # most houses $100K = $300K 
+
+#hist of all numeric variables
+#source: https://drsimonj.svbtle.com/quick-plot-of-all-variables 
+train %>%
+  keep(is.numeric) %>% 
+  gather() %>% 
+  ggplot(aes(value)) +
+  facet_wrap(~ key, scales = "free") +
+  geom_histogram()
+
 
 # Use the pairs command to plot all variables against eachother
 # Use slice to plot only the first 100 observations.	
@@ -99,8 +102,13 @@ plot(SalePrice ~ YearRemodAdd, data=train)
 ################################# FEATURE ENGINEERING  ###########################
 ##################################################################################
 
+# TIDYR REFRESHER
+# rearrange rows and columns using gather() and spread()
+# separate(dataset, name of colum to separate, c('new column', 'new column'), sep)
+# unite() does reverse: unite(data, 'new column', ...[selected columns], sep = _)
 
-# DPLYR DATA MANIPULATION REFRESHER
+
+# DPLYR REFRESHER
 # on variables:
 # select(df, 1:4, -2)
 # mutate(df, z = x + y)
@@ -132,4 +140,9 @@ arrange(train, SalePrice, YrSold)
 # summarize(train, sum = sum(SalePrice, na.rm = TRUE), avg = mean(SalePrice, na.rm = TRUE), var = var(SalePrice, na.rm = TRUE))
 # doesn't work
 
+
+# Pre-processing:
+# separate: BldgType, HouseStyle
+# make variables into binary variables?
+# Make 'Gd' values numeric (in ExterQual, BsmtQual)
 
