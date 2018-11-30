@@ -12,7 +12,7 @@
 # load libraries using pacman to make the file more easily shareable
 if(!require(pacman)){install.packages('pacman')}
 pacman::p_load(dplyr, tidyr, purrr, ggplot2, caret,randomForest, rpart, 
-               rpart.plot, RColorBrewer, rattle, party, Hmisc, mlr, data.table)
+               rpart.plot, RColorBrewer, rattle, party, Hmisc, mlr, data.table, GGally, ggcorrplot, corrplot)
 
 
 # set working directory and files; read.csv automatically makes strings into factors; override this.
@@ -23,6 +23,11 @@ test = read.csv("test.csv", stringsAsFactors = FALSE)
 ##################################################################################
 ################################ OVERVIEW OF DATA ################################ 
 ##################################################################################
+
+# The data set used in this project describes the sale of individual residential
+# property in Ames, Iowa from 2006 to 2010. The data set contains 2930
+# observations and 80 explanatory variables (23 nominal, 23
+# ordinal, 14 discrete, and 20 continuous) involved in assessing home values. [A description of the data is linked here.](https://github.com/annieeby/Capstone-House-Prices/blob/master/data_description.txt)
 
 # view class to verify it is a data frame
 class(train)
@@ -36,113 +41,721 @@ names(train)
 # take a quick look at the dataframe
 str(train)
 summary(train)
-
-#tbl_df(train)
-
-# columns with NA's: LotFrontage, MasVnrArea, GarageYrBlt; many more but <NA> is char
-# ways to deal with NA's: train[complete.cases(train), ]; na.omit(train)
-
 head(train)
 
-# note: data is already tidy with all columns as variables (contains all values that measure the same attribute across units) and all rows as observations (contains all values measured on the same unit across attributes); one type of observational unit per table
 
 ##################################################################################
-################################ INITIAL INSIGHTS ################################ 
+################################## PRE-PROCESSING ################################
 ##################################################################################
 
+# The data is already tidy, with all columns as variables (contains all values
+# that measure the same attribute across units) and all rows as observations
+# (contains all values measured on the same unit across attributes); one type of
+# observational unit per table
 
-# Visualize SalePrice distribution
-boxplot(train$SalePrice, horizontal = TRUE) #outliers are anything above $350K
-# boxplot(train) not possible to plot whole data frame bc non-numeric arguments
-hist(train$SalePrice, breaks = 50) # most houses $150 - $200K
-plot(train$SalePrice, main="SalePrice", sub="Full Training Data Set",
-     xlab="Observations", ylab="Price") # most houses $100K = $300K 
 
-#hist of all numeric variables
-#source: https://drsimonj.svbtle.com/quick-plot-of-all-variables 
-train %>%
-  keep(is.numeric) %>% 
-  gather() %>% 
-  ggplot(aes(value)) +
-  facet_wrap(~ key, scales = "free") +
+################################# Combine Dataframes ############################# 
+
+# In order to manipulate our variables, we need to concatenate the train and
+# test sets. We'll make a new dataframe called “combi” with all the same rows as
+# the original two datasets, stacked in the order in which we specified: train
+# first, and test second.
+
+# Use bind_rows(), which automatically creates new columns with NA values, as needed
+# dataset = 'string' creates a column with 'string' as value for easier mapping later.
+
+combi = bind_rows(train %>% mutate(dataset = 'train'), 
+                  test %>% mutate(dataset = 'test')) 
+
+# Observe the structure of the combined dataframe.
+str(combi)
+
+
+################################### Remove Outliers ##############################
+
+# For linear regression to be effective, the model must be robust to outliers.
+# There may be some more sophisticated ways of handling outliers. A more refined
+# approach called robust regression keeps outliers but attaches very little
+# weight to them. Another called Least Trimmed Squares, or LTS Regression,
+# defines outliers as the points least fitting for the regression models, rather
+# than filtering them out beforehand. Filtering outliers in advance could
+# potentially make the model easier to understand but there may be an accuracy
+# tradeoff and potential for bias and error.  One person notes "If you remove
+# any proportion of the data in order to optimize some statistic, the remaining
+# data no longer represent the population in any way that would be correctly
+# analyzed using standard statistical procedures (that is, those which assume
+# your data are a random sample). Specifically, all confidence intervals,
+# prediction intervals, and p-values would be erroneous--and perhaps extremely
+# so when as much as 10% of the data are removed."
+
+# Outliers can be removed manually based on visualization or based on the data
+# point's distance from the Inter-Quartile Range. They can also be removed by
+# percent (e.g. bottom 10%, top 10%).
+
+# The dataset's author recommends **removing the data points with more than 4000
+# square feet** from the data set -- three of them are true outliers (Partial
+# Sales that likely don’t represent actual market values) and two of them are
+# simply unusual sales (very large houses priced relatively appropriately). A
+# plot of SALE PRICE versus GR LIV AREA quickly indicates these points.
+
+plot(SalePrice ~ GrLivArea, data=train, xlab = "Goundfloor Living Area", ylab = "Sale Price", main = "Checking for Outliers") 
+
+# Remove GrLivArea >= 4000 from the dataset.
+
+train <- subset(train, GrLivArea<=4000)
+
+#<span style="color:red">QUESTION: Correct to apply to train not combi?</span> 
+
+# Observe new GrLivArea
+plot(SalePrice ~ GrLivArea, data=train) 
+
+#Observe the dataset is now two observations fewer. <span style="color:red">Check previously: [ ]</span>
+str(combi)
+
+# To continue removing outliers, we can remove values that outside of the 1.5 * IQR.
+#<span style="color:red">Question: some users said removing all data points outside the 1.5 * IQR range removed _too many_ outliers. How do I determine the appropriate number of outliers?</span>
+
+#?boxplot.stats
+#outliersValue<- boxplot.stats(train$SalePrice)$out
+#train$SalePrice[!train$SalePrice %in% outliersValue]
+
+
+# Another way we could do it is to remove outliers based on their distance from the IQR
+
+##################################################################################
+##################################################################################
+# Filter numeric vars:
+Filter(is.numeric, subset(combi, dataset == "train"))
+str(numeric_train)
+
+# Note: if that doesn't work try
+combi_train <- combi[combi$dataset == "train", ]
+numeric_train <- Filter(is.numeric, combi_train)
+
+##################################################################################
+##################################################################################
+
+# Compute IQR; could also use the function IQR() 
+lowerq = quantile(numeric_train, na.rm = TRUE)[2]
+upperq = quantile(numeric_train, na.rm = TRUE)[4]
+iqr = upperq - lowerq 
+
+# Compute the bounds for a mild outlier:
+mild.threshold.upper = upperq + (iqr * 1.5) 
+mild.threshold.lower = lowerq - (iqr * 1.5)
+
+# mild outliers
+mild_outliers <- which(numeric_train > mild.threshold.upper | numeric_train < mild.threshold.lower)
+str(mild_outliers)
+  
+# Compute the bounds for an extreme outlier:
+extreme.threshold.upper = (iqr * 3) + upperq
+extreme.threshold.lower = lowerq - (iqr * 3)
+  
+# extreme outliers
+extreme_outliers <- which(numeric_train > extreme.threshold.upper | numeric_train < extreme.threshold.lower)
+str(extreme_outliers)
+  
+# all outliers = mild + extreme outliers
+all_outliers <- which(numeric_train > mild.threshold.upper | numeric_train < mild.threshold.lower)
+str(all_outliers)
+
+# Option 1: remove extreme outliers only
+numeric_train <- numeric_train[-extreme_outliers]
+
+# Option 2: remove all outliers
+# numeric_train <- numeric_train[-all_outliers]
+
+# Determine if outliers were correctly removed.
+str(numeric_train)
+#<span style="color:red">QUESTION: Did this actually remove any data and how do I know which data / how many data points? Also, since I did this in a new dataframe, will it alter my original combi frame as well?</span> 
+
+# Another method of removing outliers: replace based on percentiles. E.g. remove
+# all bottom 5% and top 95% data points.
+# percSalePrice =quantile(combi$SalePrice,probs = c(.05,.95), na.rm = TRUE)
+# combi = combi %>% 
+#   mutate(SalePrice = ifelse(SalePrice < percSalePrice[1], percSalePrice[1], 
+#                             ifelse(SalePrice > percSalePrice[2], percSalePrice[2], SalePrice)))
+
+############################## Impute Missing Values #############################
+
+#There are some simple ways to deal with NA's: train[complete.cases(train), ] or
+#na.omit(train). But that would remove far too much data. Moreover, this
+#data set has many NA's that do not indicate _missing_ data but rather mean “not
+#present”. For example, the NA’s in categorical variables like Alley,
+#LotFrontage, MasVnrArea, GarageYrBlt. Those NA's should indicate that the
+#feature doesn't exist for this observation. But other NAs would be better
+#represented as a mean. Still others, would be better replaced with a string
+#that indicates "typical". The dataset requires going through each
+#variable one by one to determine what kind of replacement is best suited.
+
+head(combi)  
+  
+#NA counts for each column in a dataframe:
+sapply(combi, function(x) sum(is.na(x)))
+
+# Replace multiple columns of NAs with most appropriate values
+
+# Replace NA with "None"
+vars_to_none = c("Alley", "BsmtQual", "BsmtCond", "BsmtExposure", "BsmtFinType1", "BsmtFinSF1", "BsmtFinType2", "FireplaceQu", "GarageType", "GarageYrBlt", "GarageFinish", "GarageQual", "GarageCond", "PoolQC", "Fence", "MiscFeature", "MasVnrType")
+sapply(combi %>% select(vars_to_none), function(x) x = ifelse(is.na(x), "None", x))
+
+# Replace NA with mean
+vars_to_mean = c("LotFrontage", "MasVnrArea", "GarageYrBlt")
+sapply(combi %>% select(vars_to_mean), function(x) x = ifelse(is.na(x), mean(x, na.rm = T), x))
+
+# Replace NA with 0
+vars_to_zero = c("BedroomAbvGr", "GarageCars", "GarageArea", "BsmtFinSF2", "BsmtUnfSF", "TotalBsmtSF", "BsmtFullBath", "BsmtHalfBath")
+sapply(combi %>% select(vars_to_zero), function(x) x = ifelse(is.na(x), 0, x))
+
+# Replace NA with "Typ"
+vars_to_typ = c("Functional")
+sapply(combi %>% select(vars_to_typ), function(x) x = ifelse(is.na(x), "Typ", x))
+
+# Replace NA with "TA"
+vars_to_ta = c("KitchenQual")
+sapply(combi %>% select(vars_to_ta), function(x) x = ifelse(is.na(x), "TA", x))
+
+# Unclear what to do with NA: MSZoning, Utilities, Exterior1st, Exterior2nd,  Electrical  
+# Change this one when figure out how to handle.
+vars_to_temp = c("MSZoning", "Utilities", "Exterior1st", "Exterior2nd",  "Electrical")  
+sapply(combi %>% select(vars_to_temp), function(x) x = ifelse(is.na(x), "Temp", x))
+
+head(combi)
+summary(combi)
+
+# ------------------------ Issue w/ Code ----------------------------
+
+#<span style="color:red"># Some variables are still showing NAs: GarageCars, GarageArea, GarageYrBlt, BsmtFullBath, BsmtHalfBath. I intentionally left SalePrice NA's</span>
+which(is.na(combi$BsmtFullBath))
+combi$BsmtFullBath[2121]
+
+# <span style="color:red">Something amiss. Alley still has NAs. After factoring below, alley should be a factor with three levels: Grvl (Gravel), Pave (Pavement), and None. But getting two levels + NA.</span>
+
+# -------------------------------------------------------------------
+
+
+######################## Discretize Categorical Attributes #######################
+
+# Some numerical features are actually categories. The 2919 numerics can be
+# factored to the appropriate number of levels.
+
+# MSSubClass identifies the type of dwelling involved in a sale. It should be a factor with 16 levels.
+str(combi$MSSubClass)
+combi$MSSubClass <- factor(combi$MSSubClass)
+str(combi$MSSubClass)
+
+# Mosold means "month sold". It should be a factor with 12 levels.
+str(combi$MoSold)
+combi$MoSold <- factor(combi$MoSold)
+str(combi$MoSold)
+
+str(combi$GarageQual)
+combi$GarageQual <- factor(combi$GarageQual)
+str(combi$GarageQual)
+unique(combi$GarageQual)
+
+str(combi$GarageCond)
+combi$GarageCond <- factor(combi$GarageCond)
+str(combi$GarageCond)
+unique(combi$GarageCond)
+
+# Factor remaining categorical variables
+cols <- c("Alley", "ExterQual", "ExterCond", "BsmtQual", "BsmtCond",
+           "HeatingQC", "KitchenQual", "FireplaceQu", "GarageQual",
+           "GarageCond", "PoolQC", "OverallCond", "OverallQual",
+           "LotShape", "LandContour", "Utilities", "LotConfig",
+           "LandSlope", "Neighborhood", "Condition1", "Condition2",
+           "BldgType", "HouseStyle", "RoofStyle", "RoofMat1",
+           "Exterior1st", "Exterior2nd", "MasVnrType", "BsmtFinType2",
+           "Heating")
+combi[c(cols)] <- lapply(combi[c(cols)], factor)
+str(combi)
+
+# <span style="color:red">Many of these variables did not factor and still remain chars</span>
+
+# # There is an option to create a 0-5 system for quality-related factor levels. This is for later variable consolidation (via multiplication).
+# # Alt system: "NONE": 0, "Po": 1, "Fa": 2, "TA": 4, "Gd": 7, "Ex": 11 -- This may better differentiate the quality implied between factor levels.
+#
+# # Identify variables that are factored by quality rating.
+qual_cols <- c("ExterQual", "ExterCond", "BsmtQual", "BsmtCond", "HeatingQC", "KitchenQual", "FireplaceQu", "GarageQual", "GarageCond", "PoolQC")
+#
+# # Replace factor names with new qual_rating vector.
+# # None (None), Po (Poor), Fa (Fair), TA (Typical), Gd (Good), Ex (Excellent)
+qual_rating <- factor(c("NA", "Po", "Fa", "TA", "Gd", "Ex"))
+qual_rating <- factor(c(0, 1, 2, 3, 4, 5))
+qual_rating
+# 
+# # <span style="color:red">Code above not right... How do I do this?</span>
+
+#------------------------------ Continue Factorization --------------------------#
+
+# # The following factors do not as neatly correspond to numbers as qual_rating.
+# 
+# # <span style="color:red">Code below is similarly not right... How do I do this?</span>
+# 
+# Refers to basement: Gd (Good Exposure), Av (Average Exposure), Mn (Mimimum Exposure), None (No Exposure)
+x <- factor(c("None", "Mn", "Av", "Gd"))
+x <- sample(c(0, 1, 2, 3, 4), replace = TRUE)
+ 
+# Refers to alley  
+x <- factor(c("None", "Grvl", "Pave"))
+x <- sample(c(0, 1, 2), replace = TRUE)
+
+# Refers to quality of basement finished area 
+x <- factor(c("None", "Unf", "LwQ", "Rec", "BLQ", "ALQ", "GLQ"))
+x <- sample(c(0, 1, 2, 3, 4, 5, 6), replace = TRUE)
+# 
+# # Refers to home functionality: Typical Functionality, Minor Deduction, Severely Damaged, Salvage Only
+# x <- factor(c("Sal", "Sev", "Maj2", "Maj1", "Mod", "Min2", "Min1", "Typ"))
+# x <- sample(c(1, 2, 3, 4, 5, 6, 7, 8), replace = TRUE)
+# 
+# # Refers to slope of property: severe, moderate, gentle
+# x <- factor(c("Sev", "Mod", "Gtl"))
+# x <- sample(c(1, 2, 3), replace = TRUE)
+# 
+# # Refers to general shape of property: IR3 Irregular, IR2 Moderately Irregular, IR1 Slightly Irregular
+# x <- factor(c("IR3", "IR2", "IR1", "Reg"))
+# x <- sample(c(1, 2, 3, 4), replace = TRUE)
+# 
+# # Refers to paved driveway: No, Partial, Yes
+# x <- factor(c("N", "P", "Y"))
+# x <- sample(c(1, 2, 3), replace = TRUE)
+
+#------------------------------ Levels to Numerics --------------------------#
+
+set.seed(22)
+grades <- c( "Po", "Fa", "TA", "Gd", "Ex")
+GarageQual <- sample(grades, 20, replace = TRUE)
+GarageCond <- sample(grades, 20, replace = TRUE)
+match(GarageQual, grades) * match(GarageCond, grades)
+
+########## delete
+head(GarageQual)
+head(GarageCond)
+GarageGrade - 4, 6, 15
+?match
+########## end delete
+
+
+
+
+
+################################# Feature Engineering ############################
+
+# Feature engineering is one of the most important aspect of machine learning.
+# Here, we want to create variables that provide the best information for the machine
+# learning models. Some features in the dataset are overlapping or very specific or unclear. By
+# combining like variables we can get a simplified, and perhaps better
+# overarching understanding of the data. For example, a better correlation to sale price than square footage and bathrooms by floor
+# level might be total square footage and the total number of bathrooms.
+
+# Overall quality of the house
+combi$OverallGrade <- combi$OverallQual * combi$OverallCond
+
+# Overall quality of the garage
+combi$GarageGrade <- combi$GarageQual * combi$GarageCond
+str(combi$GarageQual)
+str(combi$GarageCond)
+
+# Overall quality of the exterior
+combi$ExterGrade <- combi$ExterQual * combi$ExterCond
+
+# Overall kitchen score
+combi$KitchenScore <- combi$KitchenAbvGr * combi$KitchenQual
+
+# Overall fireplace score
+combi$FireplaceScore <- combi$Fireplaces * combi$FireplaceQu
+
+# Overall garage score
+combi$GarageScore <- combi$GarageArea * combi$GarageQual
+
+# Overall pool score
+combi$PoolScore <- combi$PoolArea * combi$PoolQC
+
+# Simplified overall quality of the house
+combi$SimplOverallGrade <- combi$SimplOverallQual * combi$SimplOverallCond
+
+# Simplified overall quality of the exterior
+combi$SimplExterGrade <- combi$SimplExterQual * combi$SimplExterCond
+
+# Simplified overall pool score
+combi$SimplPoolScore <- combi$PoolArea * combi$SimplPoolQC
+
+# Simplified overall garage score
+combi$SimplGarageScore <- combi$GarageArea * combi$SimplGarageQual
+
+# Simplified overall fireplace score
+combi$SimplFireplaceScore <- combi$Fireplaces * combi$SimplFireplaceQu
+
+# Simplified overall kitchen score
+combi$SimplKitchenScore <- combi$KitchenAbvGr * combi$SimplKitchenQual
+
+# Total number of bathrooms
+combi$TotalBath <- combi$BsmtFullBath + (0.5 * combi$BsmtHalfBath) + 
+  combi$FullBath + (0.5 * combi$HalfBath)
+
+# Total SF for house (incl. basement)
+combi$AllSF <- combi$GrLivArea + combi$TotalBsmtSF
+
+# Total SF for 1st + 2nd floors
+combi$AllFlrsSF <- combi$X1stFlrSF + combi$X2ndFlrSF
+
+# Total SF for porch
+combi$AllPorchSF <- combi$OpenPorchSF + combi$EnclosedPorch + 
+  combi$X3SsnPorch + combi$ScreenPorch
+
+#-----------------------------------Binary Variables-----------------------------#
+
+# Has masonry veneer or not
+combi$HasMasVnr <- ifelse((combi$MasVnrType == "None"), 0, 1)
+
+# House completed before sale or not
+combi$BoughtOffPlan <- ifelse((combi$SaleCondition == "Partial"), 1, 0) 
+
+# Check for added column names
+colnames(combi)
+
+########################### Transform Skewed Attributes ##########################
+
+# Regression techniques require a normal distribution. <span style="color:red">[Insert why this is.]</span>
+# A histogram plot shows the distribution of the target variable ‘SalePrice’ as
+# being was right-skewed. A "skewed right" distribution is one in which the tail
+# is on the right side. Most sales prices are on the low side of the scale and
+# there are very few high sales prices.  
+
+combi_train <- combi[combi$dataset == "train", ]
+
+# Histogram of SalePrice with skewed-right distribution 
+ggplot(data=combi_train, aes(SalePrice)) + 
+  ggtitle("Histogram for Sale Price") + 
+  xlab("Sale Price") +
+  ylab("Count")+
+  geom_histogram(binwidth = 10000)
+
+# We can normalize the data by way of log-transformation
+combi_train$SalePrice <- log1p(combi_train$SalePrice)
+
+# Histogram of SalePrice with normal distribution 
+ggplot(data=combi_train, aes(SalePrice)) + 
+  ggtitle("Histogram for Sale Price") + 
+  xlab("Sale Price") +
+  ylab("Count")+
   geom_histogram()
 
+# It's possible to transform any numeric variable using log transformation, e.g.:
+hist(combi$TotalBath)
+combi$TotalBath <- log1p(combi$TotalBath)
+hist(combi$TotalBath)
 
-# Use the pairs command to plot all variables against eachother
-# Use slice to plot only the first 100 observations.	
-# pairs(train %>% slice(1:100)) # does not work bc non-numerc arguments
+########################### ASK STACK OVERFLOW ####################
 
-plot(SalePrice ~ MSSubClass, data=train)
-plot(SalePrice ~ MSZoning, data=train)
-plot(SalePrice ~ LotFrontage, data=train)
-plot(SalePrice ~ LotArea, data=train)
-plot(SalePrice ~ Street, data=train) #no plot
-plot(SalePrice ~ Alley, data=train) #no plot
-plot(SalePrice ~ LotShape, data=train) #no plot
-plot(SalePrice ~ LandContour, data=train) #no plot
-plot(SalePrice ~ Utilities, data=train) #no plot
-plot(SalePrice ~ LotConfig, data=train) 
-plot(SalePrice ~ LandSlope, data=train) 
-plot(SalePrice ~ Neighborhood, data=train) 
+# View all numeric variable distributions
+# sapply(numeric_train %>% function(x) hist(x))
+# <span style="color:red">Doesn't work^</span>
+       
+# Log transform and view normalized distribution for all numeric variables
+# sapply(combi %>% filter(is.numeric, x), function(x) hist(x) %>% 
+#          x <- log1p(x) %>%
+#          hist(x))
+# <span style="color:red">Doesn't work^</span>
 
-#Sale price shows strong correlation with Overall Quality
-plot(SalePrice ~ OverallQual, data=train) 
+########################### Bivariate Relationship Analysis ######################
 
-#Sale price has high price for middle quality (non-linear correlation)
-plot(SalePrice ~ OverallCond, data=train) 
+# Create a boxplot for every numeric variable with variable names on the x-axis
+# and SalePrice on the y-axis.
 
-#Sale price somewhat (minimally) correlated to year built
-plot(SalePrice ~ YearBuilt, data=train) 
+sapply(combi %>% filter(is.numeric, x), function(x) 
+  ggplot(train, aes(x = x, y = SalePrice, fill = x)) + 
+    geom_boxplot())
+# <span style="color:red">Doesn't work^</span>
 
-#Sale price somewhat (minimally) correlated to year remodel added
-plot(SalePrice ~ YearRemodAdd, data=train) 
+############################### Correlation Matrix ###############################
+
+# Multicollinearity exists whenever two or more of the predictors in a regression 
+# model are moderately or highly correlated. This correlation is a problem because 
+# independent variables should be independent. If the degree of correlation between 
+# variables is high enough, it can cause problems when you fit the model and interpret 
+# the results. The idea is that you can change the value of one independent variable 
+# and not the others. However, when independent variables are correlated, it indicates 
+# that changes in one variable are associated with shifts in another variable. The 
+# stronger the correlation, the more difficult it is to change one variable without 
+# changing another. It becomes difficult for the model to estimate the relationship 
+# between each independent variable and the dependent variable independently because the 
+# independent variables tend to change in unison. 
+
+# To check for multicollinearity, I created a
+# correlation matrix with respect to the target variable ‘SalePrice’. Some
+# variables are highly correlated such as [TBD - e.g. GarageArea and GarageCars].  This
+# makes sense because [TBD -e.g. the size of a garage determines('GarageArea') the number 
+# of cars that fit in it ('GarageCars')]. Other highly correlated variables show similar 
+# dependency.
+
+
+
+forcorrplot <- cor(numeric_train)
+corrplot(forcorrplot, method="color")
+
+
+# Compute a correlation matrix
+corr_train <- combi_train %>% keep(is.numeric) %>% subset(combi_train, -train$Id)
+data(corr_train)
+corr <- round(cor(corr_train), 1)
+head(corr[, 1:6])
+
+# Compute a matrix of correlation p-values.
+# A note on p-values: The P-value is the probability that you would have found the current result if the correlation coefficient were in fact zero (null hypothesis). If this probability is lower than the conventional 5% (P<0.05) the correlation coefficient is called statistically significant.
+p.mat <- cor_pmat(train)
+head(p.mat[, 1:4])
+
+# Visualize the correlation matrix
+# method = "square" (default)
+ggcorrplot(corr)
+
+# using hierarchical clustering (hc.order) and correlation coefficients (lab), barring the no significant coefficient (p.mat)
+ggcorrplot(corr, hc.order = TRUE, outline.col = "white", lab = TRUE, p.mat = p.mat)
+
+
+cor(train %>%  select(numericalVars)) %>% View()
+
+########################### Select Attributes for Training #######################
+# Now we can select the feature subset. We should be able to eliminate some of
+# the original variables that are represented by the new engineered combination
+# variables. 
+
+#-------------------------- Remove Polynomial Attributes ------------------------#
+
+# create a vector with all the variables used to create the polynomial attributes
+vars_to_remove <- c("OverallQual", "OverallCond", "GarageQual", "GarageCond", 
+                    "ExterQual", "ExterCond", "KitchenAbvGr", "KitchenQual", "Fireplaces", 
+                    "FireplaceQu", "GarageArea", "GarageQual", "PoolArea", "PoolQC",
+                    "SimplOverallQual", "SimplOverallCond", "SimplExterQual", "SimplExterCond",
+                    "PoolArea", "SimplPoolQC", "GarageArea", "SimplGarageQual", "Fireplaces", 
+                    "SimplFireplaceQu", "KitchenAbvGr", "SimplKitchenQual", "BsmtFullBath", 
+                    "BsmtHalfBath", "FullBath", "HalfBath", "GrLivArea", "TotalBsmtSF", 
+                    "X1stFlrSF", "X2ndFlrSF", "OpenPorchSF", "EnclosedPorch", "X3SsnPorch",
+                    "ScreenPorch")
+
+# remove variables
+combi <- combi[, !(colnames(combi) %in% c(vars_to_remove))]
+
+# check updated variable names
+names(combi)
+
+#-------------------------- Remove Correlated Attributes ------------------------#
+
+# The correlation matrices reveal attribute pairs whose correlation values are
+# more than <span style="color:red">[0.TBD]</span>. These attributes can be
+# dropped as well. <span style="color:red">[Insert reason]</span>
+
+
+#-------------------------Remove Non-Normal Distributions------------------------#
+
+#Some attributes will perform poorly because they are not normally distributed
+#even after transformation. These attributes can be removed.
+
+
+############################## SPLIT DATAFRAMES ################################
+
+# Split the test and training sets back into their original states
+
+train <- combi[combi$dataset=='train',]
+test <- combi[combi$dataset=='test',]
+glimpse(train)
+
 
 ##################################################################################
-################################## DATA CLEANING AND #############################
-################################# FEATURE ENGINEERING  ###########################
+################################# REGRESSION MODELS ##############################
 ##################################################################################
 
-# TIDYR REFRESHER
-# rearrange rows and columns using gather() and spread()
-# separate(dataset, name of colum to separate, c('new column', 'new column'), sep)
-# unite() does reverse: unite(data, 'new column', ...[selected columns], sep = _)
+# Evaluation approach: 10-fold cross validation + Root-Mean-Square-Error (RMSE) 
+# to evaluate the performance of models.
+# http://www.shihaiyang.me/2018/04/16/house-prices/
 
 
-# DPLYR REFRESHER
-# on variables:
-# select(df, 1:4, -2)
-# mutate(df, z = x + y)
-# on observations:
-# filter(df, a > 0)
-#     x %in% c(a, b, c), TRUE if x is in the vector c(a, b, c)
-# on groups:
-# summarize()
-# pipe operator: object %>% function()
-# group_by()
+####### Linear Regression
 
-# Regex: https://www.rstudio.com/wp-content/uploads/2016/09/RegExCheatsheet.pdf
+# R Squared
+# Adjusted R Squared adjusts the R Squared value to account for the number of
+# independent variables used relative to the number of data points. Multiple
+# R-Squared will always increase if you add more independent variables, but
+# adjusted R-squared will decrease if you add an independent variable that
+# doesn't help the model. This is a good way to determine if a variable should
+# even be included in the model.
 
-# create a new table selecting only the last four variables from above
-year_cond <- select(train, OverallQual, OverallCond, YearBuilt, YearRemodAdd)
-hist(year_cond)
-plot(SalePrice ~ year_cond, data=train) # does not work
+# Coefficients
+# A coefficient of zero means that the value of the indpendent valriable does
+# not change our prediction for the dpendent variable. If the coefficient is not
+# significantly different from zero, we should remove it from the model since
+# it's not helping the prediction.
 
-# filter houses to include only 2 story houses (445 observations)
-filter(train, HouseStyle == '2Story')
+# Std. Error
+# The standard error gives the measure of how much the coefficient is likely to vary from the estimate value
 
-# filter houses to include only houses with equal to or more than 1500 sqft of ground floor living area
-filter(train, GrLivArea >= 1500)
+# t value
+# The t-value is the estimate divided by the standard error. It's positive
+# negative sign follows the estimate's sign. The larger the absolute value of
+# the t-value, the more likely the coefficient is to be significant. So we want
+# independent variables with a large absolute value in this column.
 
-# arrange by SalePrice, then by YrSold
-arrange(train, SalePrice, YrSold)
+# Pr(>|t|)
+# Gives the measure of how plausible it is that the coefficient is actually
+# zero, given the data used to build the model. The smaller the probability
+# number, the less likely it is that the coefficient is actually zero. The size of this number is inverse to the size of the t value. We want independent variables with small values in this column. 
 
-# summarize
-# summarize(train, sum = sum(SalePrice, na.rm = TRUE), avg = mean(SalePrice, na.rm = TRUE), var = var(SalePrice, na.rm = TRUE))
-# doesn't work
+# The star coding scheme is the easiest way to see if a variable is significant.
+# Three stars is the highest level of significance and corresponds to the
+# smallest possible probabilities. A period or dot means a variable is _almost_
+# significant. Nothing at the end of a row means the variable is insignificant
+# in the model. The number of stars can change for the same variable from model to model. 
+# This is due to multicollinearity.
 
 
-# Pre-processing:
-# separate: BldgType, HouseStyle
-# make variables into binary variables?
-# Make 'Gd' values numeric (in ExterQual, BsmtQual)
+#-------------------------- Fit 1 ------------------------#
+fit1<- lm(SalePrice ~ OverallQual, data = combi)
+summary(fit1)
 
+SSE = sum(fit1$residuals^2)
+SSE
+
+#-------------------------- Fit 2 ------------------------#
+# OverallQual and GrLivArea both have ***, indicating these are very significant variables. 
+fit2<- lm(SalePrice ~ OverallQual + GrLivArea, data = combi)
+summary(fit2)
+
+SSE = sum(fit2$residuals^2)
+SSE
+
+#-------------------------- Fit 3 ------------------------#
+# Notice adding AllPorchSF yields Adjusted R-squared goes down while Multiple
+# R-squared stays the same; indicates it is not a very important determining
+# variable. We also see that AllPorchSF has a high Probability value and no Signif. 
+# codes, indicating it is not a significant variable.
+
+fit3<- lm(SalePrice ~ OverallQual + GrLivArea + AllPorchSF, data = combi)
+summary(fit3)
+
+SSE = sum(fit3$residuals^2)
+SSE
+
+##################################### SUBMIT #####################################
+
+
+# build a dataframe with results
+submit.house <- data.frame(Id = test$Id, SalePrice = [TBD])
+
+# write results to .csv for submission
+write.csv(submit.house, file="house_modelTBD.csv",row.names=FALSE)
+
+
+#Resources
+#https://nycdatascience.com/blog/student-works/machine-learning-project-house-prices-advanced-regression-techniques/ 
+#http://web.cse.ohio-state.edu/~shi.876/slides/5523.pdf
+#http://www.shihaiyang.me/2018/04/16/house-prices/ 
+#https://nycdatascience.com/blog/student-works/machine-learning-project-house-prices-advanced-regression-techniques/
+#https://towardsdatascience.com/predicting-housing-prices-using-advanced-regression-techniques-8dba539f9abe
+#https://www.kaggle.com/juliencs/a-study-on-regression-applied-to-the-ames-dataset  
+
+
+
+
+
+
+
+
+
+
+##################################################################################
+################################### SCRATCHPAD ################################### 
+##################################################################################
+
+
+# plot(train$SalePrice, main="SalePrice", sub="Full Training Data Set",
+#      xlab="Observations", ylab="Price") # most houses $100K = $300K 
+# boxplot(train$SalePrice, horizontal = TRUE) #outliers are anything above $350K
+# hist(train$SalePrice, breaks = 50) # most houses $150 - $200K
+
+
+
+# Scatter plots of numerical variables vs. sale price
+# QUESTION: HOW?
+
+# Bar charts of all categorical variables vs. sale price
+# QUESTION: HOW?
+
+
+##############
+#Categorical attributes: 
+#qual_dict = {"NONE": 0, "Po": 1, "Fa": 2, "TA": 4, "Gd": 7, "Ex": 11}
+  #qual_cols = ["ExterQual", "ExterCond", "BsmtQual", "BsmtCond", "HeatingQC", 
+  #             "KitchenQual", "FireplaceQu", "GarageQual", "GarageCond", "PoolQC"]
+  # http://www.shihaiyang.me/2018/04/16/house-prices/
+
+
+# # Encode some categorical features as ordered numbers when there is information in the order
+# train = train.replace({"Alley" : {"Grvl" : 1, "Pave" : 2},
+#   "BsmtCond" : {"No" : 0, "Po" : 1, "Fa" : 2, "TA" : 3, "Gd" : 4, "Ex" : 5},
+#   "BsmtExposure" : {"No" : 0, "Mn" : 1, "Av": 2, "Gd" : 3},
+#   "BsmtFinType1" : {"No" : 0, "Unf" : 1, "LwQ": 2, "Rec" : 3, "BLQ" : 4, 
+#     "ALQ" : 5, "GLQ" : 6},
+#   "BsmtFinType2" : {"No" : 0, "Unf" : 1, "LwQ": 2, "Rec" : 3, "BLQ" : 4, 
+#     "ALQ" : 5, "GLQ" : 6},
+#   "BsmtQual" : {"No" : 0, "Po" : 1, "Fa" : 2, "TA": 3, "Gd" : 4, "Ex" : 5},
+#   "ExterCond" : {"Po" : 1, "Fa" : 2, "TA": 3, "Gd": 4, "Ex" : 5},
+#   "ExterQual" : {"Po" : 1, "Fa" : 2, "TA": 3, "Gd": 4, "Ex" : 5},
+#   "FireplaceQu" : {"No" : 0, "Po" : 1, "Fa" : 2, "TA" : 3, "Gd" : 4, "Ex" : 5},
+#   "Functional" : {"Sal" : 1, "Sev" : 2, "Maj2" : 3, "Maj1" : 4, "Mod": 5, 
+#     "Min2" : 6, "Min1" : 7, "Typ" : 8},
+#   "GarageCond" : {"No" : 0, "Po" : 1, "Fa" : 2, "TA" : 3, "Gd" : 4, "Ex" : 5},
+#   "GarageQual" : {"No" : 0, "Po" : 1, "Fa" : 2, "TA" : 3, "Gd" : 4, "Ex" : 5},
+#   "HeatingQC" : {"Po" : 1, "Fa" : 2, "TA" : 3, "Gd" : 4, "Ex" : 5},
+#   "KitchenQual" : {"Po" : 1, "Fa" : 2, "TA" : 3, "Gd" : 4, "Ex" : 5},
+#   "LandSlope" : {"Sev" : 1, "Mod" : 2, "Gtl" : 3},
+#   "LotShape" : {"IR3" : 1, "IR2" : 2, "IR1" : 3, "Reg" : 4},
+#   "PavedDrive" : {"N" : 0, "P" : 1, "Y" : 2},
+#   "PoolQC" : {"No" : 0, "Fa" : 1, "TA" : 2, "Gd" : 3, "Ex" : 4},
+#   "Street" : {"Grvl" : 1, "Pave" : 2},
+#   "Utilities" : {"ELO" : 1, "NoSeWa" : 2, "NoSewr" : 3, "AllPub" : 4}}
+# )
+
+
+################## VARIABLE SELECTION #########
+
+# Consider the relationship shown in the distplots and boxplots, we finally
+# decide to drop these columns: BsmtHalfBath, KitchenAbvGr, MaxVnrArea,
+# BsmtFinSF1, BsmtFinSF2, 2ndFlrSF, LowQualFinSF, WoodDeckSF, OpenPorchSF,
+# EnclosedPorch, 3SsnPorch, ScreenPorch, PoolArea, MiscVal, Utilities,
+# Condition2, and RootMatl.
+# 
+# In [ ]:
+#   drops = ["BsmtHalfBath", "KitchenAbvGr", "MasVnrArea", "BsmtFinSF1", 
+#            "BsmtFinSF2", "2ndFlrSF", "LowQualFinSF", "WoodDeckSF", 
+#            "OpenPorchSF", "EnclosedPorch", "3SsnPorch", "ScreenPorch", 
+#            "PoolArea", "MiscVal", "Utilities", "Condition2", "RoofMatl"]
+
+
+
+
+#train$TotalSF <- train$X1stFlrSF + train$X2ndFlrSF + train$BsmtFinSF1 + train$BsmtFinType2
+#train$TotalBath <- train$BsmtFullBath + 0.5*train$BsmtHalfBath + train$FullBath + 0.5*train$HalfBath
+# 
+# numericalVars = names(combi)[which(sapply(combi %>% filter(dataset == 'train'), function(x) is.numeric(x)))]
+# numeric_train <- sapply(combi %>% filter(dataset == 'train'), function(x) is.numeric(x))
+
+# Alt option for filtering numerical vars:
+numericalVars = names(combi)[which(sapply(combi %>% filter(dataset == 'train'), function(x) is.numeric(x)))]
+numeric_train <- combi[,which(combi$dataset == 'train')]
+
+# Parallel coordinates plot using GGally
+library(GGally)
+
+# All columns except sales price
+group_by_sale_price <- 80
+my_names <- (1:82)[-group_by_sale_price]
+
+# Basic parallel plot - each variable plotted as a z-score transformation
+ggparcoord(train, my_names, groupColumn = group_by_sale_price, alpha = 0.8)
+
+
+
+<span style="color:red">red</span>
