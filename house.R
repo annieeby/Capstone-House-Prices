@@ -240,20 +240,6 @@ str(combi$MoSold)
 combi$MoSold <- factor(combi$MoSold)
 str(combi$MoSold)
 
-# # Factor remaining categorical variables
-# # Note: may not want to do this for these variables; commenting out for now.
-# cols <- c("Alley", "ExterQual", "ExterCond", "BsmtQual", "BsmtCond",
-#            "HeatingQC", "KitchenQual", "FireplaceQu", "GarageQual",
-#            "GarageCond", "PoolQC", "OverallCond", "OverallQual",
-#            "LotShape", "LandContour", "Utilities", "LotConfig",
-#            "LandSlope", "Neighborhood", "Condition1", "Condition2",
-#            "BldgType", "HouseStyle", "RoofStyle", "RoofMatl",
-#            "Exterior1st", "Exterior2nd", "MasVnrType", "BsmtFinType2",
-#            "Heating")
-# 
-# combi[cols] <- lapply(combi[cols], factor)
-# str(combi)
-
 ################################# Feature Engineering ############################
 
 # Feature engineering is one of the most important aspect of machine learning.
@@ -274,71 +260,6 @@ combi$BoughtOffPlan <- ifelse((combi$SaleCondition == "Partial"), 1, 0)
 # Check for added column names
 colnames(combi)
 
-#---------------------------- Numericize Character Values ------------------------#
-
-
-qual_cols <- c("ExterQual", "ExterCond", "BsmtQual", "BsmtCond", "HeatingQC", "KitchenQual", "FireplaceQu", "GarageQual", "GarageCond", "PoolQC")
-quals <- c( "Po", "Fa", "TA", "Gd", "Ex")
-c(0, 1, 2, 3, 4, 5)
-
-bsmt_fin <- c("BsmtFinType1", "BsmtFinType2")
-c("None", "Unf", "LwQ", "Rec", "BLQ", "ALQ", "GLQ")
-c(0, 1, 2, 3, 4, 5, 6)
-
-"Functional"
-c("Sal", "Sev", "Maj2", "Maj1", "Mod", "Min2", "Min1", "Typ")
-c(1, 2, 3, 4, 5, 6, 7, 8)
-
-"LandSlope"
-c("Sev", "Mod", "Gtl")
-c(1, 2, 3)
-
-"LotShape"
-c("IR3", "IR2", "IR1", "Reg")
-c(1, 2, 3, 4)
-
-"PavedDrive"
-c("N", "P", "Y")
-c(1, 2, 3)
-
-"BsmtExposure"
-c("None", "Mn", "Av", "Gd")
-c(0, 1, 2, 3)
-
-"Alley"  
-c("None", "Grvl", "Pave")
-c(0, 1, 2)
-
-#---------------------------- Single Variable Generation ------------------------#
-
-set.seed(22)
-ExterQual <- sample(grades, 2919, replace = TRUE)
-ExterCond <- sample(grades, 2919, replace = TRUE)
-combi$ExterGrade <- match(ExterQual, grades) * match(ExterCond, grades)
-head(combi$ExterQual)
-head(combi$ExterCond)
-head(combi$ExterGrade) # not correct
-
-# Create GarageGrade
-
-GarageQual <- sample(grades, 2919, replace = TRUE)
-GarageCond <- sample(grades, 2919, replace = TRUE)
-combi$GarageGrade <- match(GarageQual, grades) * match(GarageCond, grades)
-head(combi$GarageQual)
-head(combi$GarageCond)
-head(combi$GarageGrade) # not correct; first 6 values should all be 9 (3*3)
-
-#---------------------------- Multiple Variable Generation ------------------------#
-
-
-qual_cols <- c("ExterQual", "ExterCond", "BsmtQual", "BsmtCond", "HeatingQC", "KitchenQual", "FireplaceQu", "GarageQual", "GarageCond", "PoolQC")
-
-combi[qual_cols] <- lapply(combi %>% select(qual_cols), function(x) x = sample(grades, 20, replace = TRUE))
-sapply(combi[qual_cols], match, grades)
-
-
-
-#--------------------------- Manual Variable Multiplication -----------------------#
 
 #--------------------------- Stack Overflow Answer Start -----------------------#
 
@@ -356,8 +277,6 @@ newdata[nm3] <- lapply(split.default(newdata[nm1], nm2), function(x) Reduce(`*`,
 set.seed(24)
 combi <- as.data.frame(matrix(sample(grades, 10 * 5, replace = TRUE), 
                               ncol = 10, dimnames = list(NULL, qual_cols)), stringsAsFactors = FALSE)
-
-
 
 #--------------------------- Stack Overflow Answer End -----------------------#
 
@@ -702,119 +621,11 @@ submit.house <- data.frame(Id = test$Id, SalePrice = [TBD])
 write.csv(submit.house, file="house_modelTBD.csv",row.names=FALSE)
 
 
-#Resources
+#################################### RESOURCES ###################################
+
 #https://nycdatascience.com/blog/student-works/machine-learning-project-house-prices-advanced-regression-techniques/ 
 #http://web.cse.ohio-state.edu/~shi.876/slides/5523.pdf
 #http://www.shihaiyang.me/2018/04/16/house-prices/ 
 #https://nycdatascience.com/blog/student-works/machine-learning-project-house-prices-advanced-regression-techniques/
 #https://towardsdatascience.com/predicting-housing-prices-using-advanced-regression-techniques-8dba539f9abe
 #https://www.kaggle.com/juliencs/a-study-on-regression-applied-to-the-ames-dataset  
-
-
-
-
-
-
-
-
-
-
-##################################################################################
-################################### SCRATCHPAD ################################### 
-##################################################################################
-
-
-# plot(train$SalePrice, main="SalePrice", sub="Full Training Data Set",
-#      xlab="Observations", ylab="Price") # most houses $100K = $300K 
-# boxplot(train$SalePrice, horizontal = TRUE) #outliers are anything above $350K
-# hist(train$SalePrice, breaks = 50) # most houses $150 - $200K
-
-
-
-# Scatter plots of numerical variables vs. sale price
-# QUESTION: HOW?
-
-# Bar charts of all categorical variables vs. sale price
-# QUESTION: HOW?
-
-
-##############
-#Categorical attributes: 
-#qual_dict = {"NONE": 0, "Po": 1, "Fa": 2, "TA": 4, "Gd": 7, "Ex": 11}
-  #qual_cols = ["ExterQual", "ExterCond", "BsmtQual", "BsmtCond", "HeatingQC", 
-  #             "KitchenQual", "FireplaceQu", "GarageQual", "GarageCond", "PoolQC"]
-  # http://www.shihaiyang.me/2018/04/16/house-prices/
-
-
-# # Encode some categorical features as ordered numbers when there is information in the order
-# train = train.replace({"Alley" : {"Grvl" : 1, "Pave" : 2},
-#   "BsmtCond" : {"No" : 0, "Po" : 1, "Fa" : 2, "TA" : 3, "Gd" : 4, "Ex" : 5},
-#   "BsmtExposure" : {"No" : 0, "Mn" : 1, "Av": 2, "Gd" : 3},
-#   "BsmtFinType1" : {"No" : 0, "Unf" : 1, "LwQ": 2, "Rec" : 3, "BLQ" : 4, 
-#     "ALQ" : 5, "GLQ" : 6},
-#   "BsmtFinType2" : {"No" : 0, "Unf" : 1, "LwQ": 2, "Rec" : 3, "BLQ" : 4, 
-#     "ALQ" : 5, "GLQ" : 6},
-#   "BsmtQual" : {"No" : 0, "Po" : 1, "Fa" : 2, "TA": 3, "Gd" : 4, "Ex" : 5},
-#   "ExterCond" : {"Po" : 1, "Fa" : 2, "TA": 3, "Gd": 4, "Ex" : 5},
-#   "ExterQual" : {"Po" : 1, "Fa" : 2, "TA": 3, "Gd": 4, "Ex" : 5},
-#   "FireplaceQu" : {"No" : 0, "Po" : 1, "Fa" : 2, "TA" : 3, "Gd" : 4, "Ex" : 5},
-#   "Functional" : {"Sal" : 1, "Sev" : 2, "Maj2" : 3, "Maj1" : 4, "Mod": 5, 
-#     "Min2" : 6, "Min1" : 7, "Typ" : 8},
-#   "GarageCond" : {"No" : 0, "Po" : 1, "Fa" : 2, "TA" : 3, "Gd" : 4, "Ex" : 5},
-#   "GarageQual" : {"No" : 0, "Po" : 1, "Fa" : 2, "TA" : 3, "Gd" : 4, "Ex" : 5},
-#   "HeatingQC" : {"Po" : 1, "Fa" : 2, "TA" : 3, "Gd" : 4, "Ex" : 5},
-#   "KitchenQual" : {"Po" : 1, "Fa" : 2, "TA" : 3, "Gd" : 4, "Ex" : 5},
-#   "LandSlope" : {"Sev" : 1, "Mod" : 2, "Gtl" : 3},
-#   "LotShape" : {"IR3" : 1, "IR2" : 2, "IR1" : 3, "Reg" : 4},
-#   "PavedDrive" : {"N" : 0, "P" : 1, "Y" : 2},
-#   "PoolQC" : {"No" : 0, "Fa" : 1, "TA" : 2, "Gd" : 3, "Ex" : 4},
-#   "Street" : {"Grvl" : 1, "Pave" : 2},
-#   "Utilities" : {"ELO" : 1, "NoSeWa" : 2, "NoSewr" : 3, "AllPub" : 4}}
-# )
-
-
-################## VARIABLE SELECTION #########
-
-# Consider the relationship shown in the distplots and boxplots, we finally
-# decide to drop these columns: BsmtHalfBath, KitchenAbvGr, MaxVnrArea,
-# BsmtFinSF1, BsmtFinSF2, 2ndFlrSF, LowQualFinSF, WoodDeckSF, OpenPorchSF,
-# EnclosedPorch, 3SsnPorch, ScreenPorch, PoolArea, MiscVal, Utilities,
-# Condition2, and RootMatl.
-# 
-# In [ ]:
-#   drops = ["BsmtHalfBath", "KitchenAbvGr", "MasVnrArea", "BsmtFinSF1", 
-#            "BsmtFinSF2", "2ndFlrSF", "LowQualFinSF", "WoodDeckSF", 
-#            "OpenPorchSF", "EnclosedPorch", "3SsnPorch", "ScreenPorch", 
-#            "PoolArea", "MiscVal", "Utilities", "Condition2", "RoofMatl"]
-
-
-
-
-#train$TotalSF <- train$X1stFlrSF + train$X2ndFlrSF + train$BsmtFinSF1 + train$BsmtFinType2
-#train$TotalBath <- train$BsmtFullBath + 0.5*train$BsmtHalfBath + train$FullBath + 0.5*train$HalfBath
-# 
-# numericalVars = names(combi)[which(sapply(combi %>% filter(dataset == 'train'), function(x) is.numeric(x)))]
-# numeric_train <- sapply(combi %>% filter(dataset == 'train'), function(x) is.numeric(x))
-
-# Alt option for filtering numerical vars:
-numericalVars = names(combi)[which(sapply(combi %>% filter(dataset == 'train'), function(x) is.numeric(x)))]
-numeric_train <- combi[,which(combi$dataset == 'train')]
-
-# Parallel coordinates plot using GGally
-library(GGally)
-
-# All columns except sales price
-group_by_sale_price <- 80
-my_names <- (1:82)[-group_by_sale_price]
-
-# Basic parallel plot - each variable plotted as a z-score transformation
-ggparcoord(train, my_names, groupColumn = group_by_sale_price, alpha = 0.8)
-
-combi[vars_to_none] <- lapply(combi[vars_to_none], function(x) { x[is.na(x)] <- "None"; x})
-
-combi[cols] <- lapply(combi[cols], function(x) { x = as.factor(x)})
-combi[vars_to_none] <- lapply(combi[vars_to_none], function(x) { x[is.na(x)] <- "None"; x})
-combi[cols] <- lapply(combi %>% select(cols), function(x) x = factor(x))
-
-
-<span style="color:red">red</span>
