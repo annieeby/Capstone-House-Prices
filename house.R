@@ -44,6 +44,7 @@ summary(train)
 head(train)
 
 
+
 ##################################################################################
 ################################## PRE-PROCESSING ################################
 ##################################################################################
@@ -125,12 +126,12 @@ str(combi)
 ##################################################################################
 ##################################################################################
 # Filter numeric vars:
-Filter(is.numeric, subset(combi, dataset == "train"))
+numeric_train <- Filter(is.numeric, subset(combi, dataset == "train"))
 str(numeric_train)
 
 # Note: if that doesn't work try
-combi_train <- combi[combi$dataset == "train", ]
-numeric_train <- Filter(is.numeric, combi_train)
+# combi_train <- combi[combi$dataset == "train", ]
+# numeric_train <- Filter(is.numeric, combi_train)
 
 ##################################################################################
 ##################################################################################
@@ -198,42 +199,31 @@ sapply(combi, function(x) sum(is.na(x)))
 
 # Replace NA with "None"
 vars_to_none = c("Alley", "BsmtQual", "BsmtCond", "BsmtExposure", "BsmtFinType1", "BsmtFinSF1", "BsmtFinType2", "FireplaceQu", "GarageType", "GarageYrBlt", "GarageFinish", "GarageQual", "GarageCond", "PoolQC", "Fence", "MiscFeature", "MasVnrType")
-sapply(combi %>% select(vars_to_none), function(x) x = ifelse(is.na(x), "None", x))
+combi[vars_to_none] <- sapply(combi %>% select(vars_to_none), function(x) x = ifelse(is.na(x), "None", x))
 
 # Replace NA with mean
 vars_to_mean = c("LotFrontage", "MasVnrArea", "GarageYrBlt")
-sapply(combi %>% select(vars_to_mean), function(x) x = ifelse(is.na(x), mean(x, na.rm = T), x))
+combi[vars_to_mean] <- sapply(combi %>% select(vars_to_mean), function(x) x = ifelse(is.na(x), mean(x, na.rm = T), x))
 
 # Replace NA with 0
 vars_to_zero = c("BedroomAbvGr", "GarageCars", "GarageArea", "BsmtFinSF2", "BsmtUnfSF", "TotalBsmtSF", "BsmtFullBath", "BsmtHalfBath")
-sapply(combi %>% select(vars_to_zero), function(x) x = ifelse(is.na(x), 0, x))
+combi[vars_to_zero] <- sapply(combi %>% select(vars_to_zero), function(x) x = ifelse(is.na(x), 0, x))
 
 # Replace NA with "Typ"
 vars_to_typ = c("Functional")
-sapply(combi %>% select(vars_to_typ), function(x) x = ifelse(is.na(x), "Typ", x))
+combi[vars_to_typ] <- sapply(combi %>% select(vars_to_typ), function(x) x = ifelse(is.na(x), "Typ", x))
 
 # Replace NA with "TA"
 vars_to_ta = c("KitchenQual")
-sapply(combi %>% select(vars_to_ta), function(x) x = ifelse(is.na(x), "TA", x))
+combi[vars_to_ta] <- sapply(combi %>% select(vars_to_ta), function(x) x = ifelse(is.na(x), "TA", x))
 
 # Unclear what to do with NA: MSZoning, Utilities, Exterior1st, Exterior2nd,  Electrical  
 # Change this one when figure out how to handle.
 vars_to_temp = c("MSZoning", "Utilities", "Exterior1st", "Exterior2nd",  "Electrical")  
-sapply(combi %>% select(vars_to_temp), function(x) x = ifelse(is.na(x), "Temp", x))
+combi[vars_to_temp] <- sapply(combi %>% select(vars_to_temp), function(x) x = ifelse(is.na(x), "Temp", x))
 
 head(combi)
 summary(combi)
-
-# ------------------------ Issue w/ Code ----------------------------
-
-#<span style="color:red"># Some variables are still showing NAs: GarageCars, GarageArea, GarageYrBlt, BsmtFullBath, BsmtHalfBath. I intentionally left SalePrice NA's</span>
-which(is.na(combi$BsmtFullBath))
-combi$BsmtFullBath[2121]
-
-# <span style="color:red">Something amiss. Alley still has NAs. After factoring below, alley should be a factor with three levels: Grvl (Gravel), Pave (Pavement), and None. But getting two levels + NA.</span>
-
-# -------------------------------------------------------------------
-
 
 ######################## Discretize Categorical Attributes #######################
 
@@ -250,96 +240,19 @@ str(combi$MoSold)
 combi$MoSold <- factor(combi$MoSold)
 str(combi$MoSold)
 
-str(combi$GarageQual)
-combi$GarageQual <- factor(combi$GarageQual)
-str(combi$GarageQual)
-unique(combi$GarageQual)
-
-str(combi$GarageCond)
-combi$GarageCond <- factor(combi$GarageCond)
-str(combi$GarageCond)
-unique(combi$GarageCond)
-
-# Factor remaining categorical variables
-cols <- c("Alley", "ExterQual", "ExterCond", "BsmtQual", "BsmtCond",
-           "HeatingQC", "KitchenQual", "FireplaceQu", "GarageQual",
-           "GarageCond", "PoolQC", "OverallCond", "OverallQual",
-           "LotShape", "LandContour", "Utilities", "LotConfig",
-           "LandSlope", "Neighborhood", "Condition1", "Condition2",
-           "BldgType", "HouseStyle", "RoofStyle", "RoofMat1",
-           "Exterior1st", "Exterior2nd", "MasVnrType", "BsmtFinType2",
-           "Heating")
-combi[c(cols)] <- lapply(combi[c(cols)], factor)
-str(combi)
-
-# <span style="color:red">Many of these variables did not factor and still remain chars</span>
-
-# # There is an option to create a 0-5 system for quality-related factor levels. This is for later variable consolidation (via multiplication).
-# # Alt system: "NONE": 0, "Po": 1, "Fa": 2, "TA": 4, "Gd": 7, "Ex": 11 -- This may better differentiate the quality implied between factor levels.
-#
-# # Identify variables that are factored by quality rating.
-qual_cols <- c("ExterQual", "ExterCond", "BsmtQual", "BsmtCond", "HeatingQC", "KitchenQual", "FireplaceQu", "GarageQual", "GarageCond", "PoolQC")
-#
-# # Replace factor names with new qual_rating vector.
-# # None (None), Po (Poor), Fa (Fair), TA (Typical), Gd (Good), Ex (Excellent)
-qual_rating <- factor(c("NA", "Po", "Fa", "TA", "Gd", "Ex"))
-qual_rating <- factor(c(0, 1, 2, 3, 4, 5))
-qual_rating
+# # Factor remaining categorical variables
+# # Note: may not want to do this for these variables; commenting out for now.
+# cols <- c("Alley", "ExterQual", "ExterCond", "BsmtQual", "BsmtCond",
+#            "HeatingQC", "KitchenQual", "FireplaceQu", "GarageQual",
+#            "GarageCond", "PoolQC", "OverallCond", "OverallQual",
+#            "LotShape", "LandContour", "Utilities", "LotConfig",
+#            "LandSlope", "Neighborhood", "Condition1", "Condition2",
+#            "BldgType", "HouseStyle", "RoofStyle", "RoofMatl",
+#            "Exterior1st", "Exterior2nd", "MasVnrType", "BsmtFinType2",
+#            "Heating")
 # 
-# # <span style="color:red">Code above not right... How do I do this?</span>
-
-#------------------------------ Continue Factorization --------------------------#
-
-# # The following factors do not as neatly correspond to numbers as qual_rating.
-# 
-# # <span style="color:red">Code below is similarly not right... How do I do this?</span>
-# 
-# Refers to basement: Gd (Good Exposure), Av (Average Exposure), Mn (Mimimum Exposure), None (No Exposure)
-x <- factor(c("None", "Mn", "Av", "Gd"))
-x <- sample(c(0, 1, 2, 3, 4), replace = TRUE)
- 
-# Refers to alley  
-x <- factor(c("None", "Grvl", "Pave"))
-x <- sample(c(0, 1, 2), replace = TRUE)
-
-# Refers to quality of basement finished area 
-x <- factor(c("None", "Unf", "LwQ", "Rec", "BLQ", "ALQ", "GLQ"))
-x <- sample(c(0, 1, 2, 3, 4, 5, 6), replace = TRUE)
-# 
-# # Refers to home functionality: Typical Functionality, Minor Deduction, Severely Damaged, Salvage Only
-# x <- factor(c("Sal", "Sev", "Maj2", "Maj1", "Mod", "Min2", "Min1", "Typ"))
-# x <- sample(c(1, 2, 3, 4, 5, 6, 7, 8), replace = TRUE)
-# 
-# # Refers to slope of property: severe, moderate, gentle
-# x <- factor(c("Sev", "Mod", "Gtl"))
-# x <- sample(c(1, 2, 3), replace = TRUE)
-# 
-# # Refers to general shape of property: IR3 Irregular, IR2 Moderately Irregular, IR1 Slightly Irregular
-# x <- factor(c("IR3", "IR2", "IR1", "Reg"))
-# x <- sample(c(1, 2, 3, 4), replace = TRUE)
-# 
-# # Refers to paved driveway: No, Partial, Yes
-# x <- factor(c("N", "P", "Y"))
-# x <- sample(c(1, 2, 3), replace = TRUE)
-
-#------------------------------ Levels to Numerics --------------------------#
-
-set.seed(22)
-grades <- c( "Po", "Fa", "TA", "Gd", "Ex")
-GarageQual <- sample(grades, 20, replace = TRUE)
-GarageCond <- sample(grades, 20, replace = TRUE)
-match(GarageQual, grades) * match(GarageCond, grades)
-
-########## delete
-head(GarageQual)
-head(GarageCond)
-GarageGrade - 4, 6, 15
-?match
-########## end delete
-
-
-
-
+# combi[cols] <- lapply(combi[cols], factor)
+# str(combi)
 
 ################################# Feature Engineering ############################
 
@@ -350,13 +263,113 @@ GarageGrade - 4, 6, 15
 # overarching understanding of the data. For example, a better correlation to sale price than square footage and bathrooms by floor
 # level might be total square footage and the total number of bathrooms.
 
+#-----------------------------------Binary Variables-----------------------------#
+
+# Has masonry veneer or not
+combi$HasMasVnr <- ifelse((combi$MasVnrType == "None"), 0, 1)
+
+# House completed before sale or not
+combi$BoughtOffPlan <- ifelse((combi$SaleCondition == "Partial"), 1, 0) 
+
+# Check for added column names
+colnames(combi)
+
+#---------------------------- Numericize Character Values ------------------------#
+
+
+qual_cols <- c("ExterQual", "ExterCond", "BsmtQual", "BsmtCond", "HeatingQC", "KitchenQual", "FireplaceQu", "GarageQual", "GarageCond", "PoolQC")
+quals <- c( "Po", "Fa", "TA", "Gd", "Ex")
+c(0, 1, 2, 3, 4, 5)
+
+bsmt_fin <- c("BsmtFinType1", "BsmtFinType2")
+c("None", "Unf", "LwQ", "Rec", "BLQ", "ALQ", "GLQ")
+c(0, 1, 2, 3, 4, 5, 6)
+
+"Functional"
+c("Sal", "Sev", "Maj2", "Maj1", "Mod", "Min2", "Min1", "Typ")
+c(1, 2, 3, 4, 5, 6, 7, 8)
+
+"LandSlope"
+c("Sev", "Mod", "Gtl")
+c(1, 2, 3)
+
+"LotShape"
+c("IR3", "IR2", "IR1", "Reg")
+c(1, 2, 3, 4)
+
+"PavedDrive"
+c("N", "P", "Y")
+c(1, 2, 3)
+
+"BsmtExposure"
+c("None", "Mn", "Av", "Gd")
+c(0, 1, 2, 3)
+
+"Alley"  
+c("None", "Grvl", "Pave")
+c(0, 1, 2)
+
+#---------------------------- Single Variable Generation ------------------------#
+
+set.seed(22)
+ExterQual <- sample(grades, 2919, replace = TRUE)
+ExterCond <- sample(grades, 2919, replace = TRUE)
+combi$ExterGrade <- match(ExterQual, grades) * match(ExterCond, grades)
+head(combi$ExterQual)
+head(combi$ExterCond)
+head(combi$ExterGrade) # not correct
+
+# Create GarageGrade
+
+GarageQual <- sample(grades, 2919, replace = TRUE)
+GarageCond <- sample(grades, 2919, replace = TRUE)
+combi$GarageGrade <- match(GarageQual, grades) * match(GarageCond, grades)
+head(combi$GarageQual)
+head(combi$GarageCond)
+head(combi$GarageGrade) # not correct; first 6 values should all be 9 (3*3)
+
+#---------------------------- Multiple Variable Generation ------------------------#
+
+
+qual_cols <- c("ExterQual", "ExterCond", "BsmtQual", "BsmtCond", "HeatingQC", "KitchenQual", "FireplaceQu", "GarageQual", "GarageCond", "PoolQC")
+
+combi[qual_cols] <- lapply(combi %>% select(qual_cols), function(x) x = sample(grades, 20, replace = TRUE))
+sapply(combi[qual_cols], match, grades)
+
+
+
+#--------------------------- Manual Variable Multiplication -----------------------#
+
+#--------------------------- Stack Overflow Answer Start -----------------------#
+
+qual_cols <- c("ExterQual", "ExterCond", "BsmtQual", "BsmtCond", "HeatingQC", "KitchenQual", "FireplaceQu", "GarageQual", "GarageCond", "PoolQC")
+grades <- c( "Po", "Fa", "TA", "Gd", "Ex")
+
+newdata <- combi[qual_cols]
+newdata[] <- lapply(combi[qual_cols], function(x) 
+  setNames(c(1, 2, 4, 6, 11), grades)[x])
+nm1 <- grep("(Cond|Qual)$", names(newdata), value = TRUE)
+nm2 <- sub("[A-Z][a-z]+$", "", nm1)
+nm3 <- paste0(unique(nm2), 'Grade')
+newdata[nm3] <- lapply(split.default(newdata[nm1], nm2), function(x) Reduce(`*`, x))
+
+set.seed(24)
+combi <- as.data.frame(matrix(sample(grades, 10 * 5, replace = TRUE), 
+                              ncol = 10, dimnames = list(NULL, qual_cols)), stringsAsFactors = FALSE)
+
+
+
+#--------------------------- Stack Overflow Answer End -----------------------#
+
+
+
 # Overall quality of the house
 combi$OverallGrade <- combi$OverallQual * combi$OverallCond
+head(combi$OverallGrade)
 
 # Overall quality of the garage
 combi$GarageGrade <- combi$GarageQual * combi$GarageCond
-str(combi$GarageQual)
-str(combi$GarageCond)
+head(combi$GarageGrade)
 
 # Overall quality of the exterior
 combi$ExterGrade <- combi$ExterQual * combi$ExterCond
@@ -405,17 +418,6 @@ combi$AllFlrsSF <- combi$X1stFlrSF + combi$X2ndFlrSF
 combi$AllPorchSF <- combi$OpenPorchSF + combi$EnclosedPorch + 
   combi$X3SsnPorch + combi$ScreenPorch
 
-#-----------------------------------Binary Variables-----------------------------#
-
-# Has masonry veneer or not
-combi$HasMasVnr <- ifelse((combi$MasVnrType == "None"), 0, 1)
-
-# House completed before sale or not
-combi$BoughtOffPlan <- ifelse((combi$SaleCondition == "Partial"), 1, 0) 
-
-# Check for added column names
-colnames(combi)
-
 ########################### Transform Skewed Attributes ##########################
 
 # Regression techniques require a normal distribution. <span style="color:red">[Insert why this is.]</span>
@@ -451,13 +453,18 @@ hist(combi$TotalBath)
 ########################### ASK STACK OVERFLOW ####################
 
 # View all numeric variable distributions
+
+sapply(combi %>% select(numeric_train), function(x) hist(x) %>%
+         x <- log1p(x) %>%
+         hist(x))
+
 # sapply(numeric_train %>% function(x) hist(x))
 # <span style="color:red">Doesn't work^</span>
        
 # Log transform and view normalized distribution for all numeric variables
-# sapply(combi %>% filter(is.numeric, x), function(x) hist(x) %>% 
-#          x <- log1p(x) %>%
-#          hist(x))
+sapply(combi %>% filter(is.numeric, x), function(x) hist(x) %>% 
+         x <- log1p(x) %>%
+         hist(x))
 # <span style="color:red">Doesn't work^</span>
 
 ########################### Bivariate Relationship Analysis ######################
@@ -471,6 +478,20 @@ sapply(combi %>% filter(is.numeric, x), function(x)
 # <span style="color:red">Doesn't work^</span>
 
 ############################### Correlation Matrix ###############################
+
+# Correlation is a measure of the linear relationship between variables. 
+# +1 = perfect positive linear relationship
+# 0 = no linear relationship
+# -1 = perfect negative linear relationship
+# Both negative and positive linear relationships indicate highly correlated variables.
+# Typically a correlation greater that +0.7 or less than -0.7 is cause for concern, though there is no definitive cutoff threshold.
+
+
+# Examples:
+# Ground floor living area and Sale price are correlated at 0.7205163
+cor(train$GrLivArea, train$SalePrice)
+# All correlations (numeric only)
+cor(numeric_train)
 
 # Multicollinearity exists whenever two or more of the predictors in a regression 
 # model are moderately or highly correlated. This correlation is a problem because 
@@ -582,6 +603,7 @@ glimpse(train)
 # adjusted R-squared will decrease if you add an independent variable that
 # doesn't help the model. This is a good way to determine if a variable should
 # even be included in the model.
+# R-squared can be calculated as 1 - SSE/SST
 
 # Coefficients
 # A coefficient of zero means that the value of the indpendent valriable does
@@ -637,6 +659,38 @@ summary(fit3)
 
 SSE = sum(fit3$residuals^2)
 SSE
+
+#-------------------------- Fit 4 ------------------------#
+# Try a linear model on two independent variables
+cor(numeric_train)
+fit4<- lm(train$TotRmsAbvGrd ~ train$BedroomAbvGr, data = combi)
+summary(fit4)
+
+SSE = sum(fit4$residuals^2)
+SSE
+str(train)
+
+#-------------------------- Prediction ------------------------#
+
+predictTest = predict(fit4, [newdata = train?])
+predictTest
+
+
+
+
+
+# Step function:
+# R provides a function, step, that will automate the procedure of trying different combinations of variables to find a good compromise of model simplicity and R2. This trade-off is formalized by the Akaike information criterion (AIC) - it can be informally thought of as the quality of the model with a penalty for the number of variables in the model.
+
+# The step function has one argument - the name of the initial model. It returns
+# a simplified model. Use the step function in R to derive a new model, with the
+# full model as the initial model (HINT: If your initial full model was called
+# "climateLM", you could create a new model with the step function by typing
+# step(climateLM). Be sure to save your new model to a variable name so that you
+# can look at the summary. For more information about the step function, type
+# ?step in your R console.)
+
+stepfit3 <- step(fit3)
 
 ##################################### SUBMIT #####################################
 
@@ -756,6 +810,11 @@ my_names <- (1:82)[-group_by_sale_price]
 # Basic parallel plot - each variable plotted as a z-score transformation
 ggparcoord(train, my_names, groupColumn = group_by_sale_price, alpha = 0.8)
 
+combi[vars_to_none] <- lapply(combi[vars_to_none], function(x) { x[is.na(x)] <- "None"; x})
+
+combi[cols] <- lapply(combi[cols], function(x) { x = as.factor(x)})
+combi[vars_to_none] <- lapply(combi[vars_to_none], function(x) { x[is.na(x)] <- "None"; x})
+combi[cols] <- lapply(combi %>% select(cols), function(x) x = factor(x))
 
 
 <span style="color:red">red</span>
