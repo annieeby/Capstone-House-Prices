@@ -1,0 +1,270 @@
+---
+title: "House Prices Wrangling Report"
+author: "Annie"
+date: "12/2/2018"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+
+Note: Instead of writing a standard text-based report, I have decided to submit my data wrangling report as a tutorial, which I will continue to build upon in further lessons. It includes everything required in the report including a summary of the most important steps I took in cleaning up the data. It also includes some questions and prospective additions that could be added at a later time. The original R script can be found in the file [house.R](https://github.com/annieeby/Capstone-House-Prices/blob/master/house.R). This is my first R Markdown document and I am still getting familiar with it. I welcome suggestions about how to make it more legible.
+
+Download Data: https://www.kaggle.com/c/house-prices-advanced-regression-techniques/data 
+
+# PREPARE FILE 
+
+First, we'll load the libraries using pacman to make the file more easily shareable. The libraries we'll use in this document are dplyr, tidyr, and ggplot2. Pacman is a great package to use when sharing code because it tell the program to install the package only if it isn't installed yet. Then it loads all packages. This means someone running your code doesn't have to go through one by one to see which packages they already have and which they need to install.
+```{r}
+if(!require(pacman)){install.packages('pacman')}
+pacman::p_load(dplyr, tidyr, purrr, ggplot2)
+```
+
+
+Next we set working directory and files The read.csv function  automatically makes strings into factors; we'll override this. Note, if you are following along, you'll need to reset the working directory to match your file location.
+
+```{r}
+setwd('~/Documents/Programming Projects/Data Sets/house_all/')
+train = read.csv("train.csv", stringsAsFactors = FALSE)
+test = read.csv("test.csv", stringsAsFactors = FALSE)
+```
+
+# OVERVIEW OF DATA 
+
+The dataset used in this project describes the sale of individual residential property in Ames, Iowa from 2006 to 2010. The data set contains 2930 observations and 80 explanatory variables (23 nominal, 23 ordinal, 14 discrete, and 20 continuous) involved in assessing home values. [A description of the data is linked here.](https://github.com/annieeby/Capstone-House-Prices/blob/master/data_description.txt)
+
+Let's explore the data.
+```{r}
+# view class to verify it is a data frame
+class(train)
+
+# view dimensions: 1460 rows, 81 columns
+dim(train)
+
+# look at column names
+names(train)
+
+# take a quick look at the dataframe
+str(train)
+summary(train)
+head(train)
+```
+
+
+# PRE-PROCESSING 
+
+The data is already tidy, with all columns as variables (contains all values that measure the same attribute across units) and all rows as observations (contains all values measured on the same unit across attributes); one type of observational unit per table
+
+
+## Combine Dataframes 
+
+In order to manipulate our variables, we need to concatenate the train and test sets. We'll make a new dataframe called “combi” with all the same rows as the original two datasets, stacked in the order in which we specified: train first, and test second.
+
+Use bind_rows(), which automatically creates new columns with NA values, as needed. Use dataset = 'insert string' to create a column with 'string' as value for easier mapping later.
+
+```{r}
+combi = bind_rows(train %>% mutate(dataset = 'train'), 
+                  test %>% mutate(dataset = 'test')) 
+```
+
+Observe the structure of the combined dataframe.
+```{r}
+str(combi)
+```
+
+## Remove Outliers 
+
+For linear regression to be effective, the model must be robust to outliers. There may be some more sophisticated ways of handling outliers. A more refined approach called robust regression keeps outliers but attaches very little weight to them. Another called Least Trimmed Squares, or LTS Regression, defines outliers as the points least fitting for the regression models, rather than filtering them out beforehand. Filtering outliers in advance could potentially make the model easier to understand but there may be an accuracy tradeoff and potential for bias and error.  One person notes "If you remove any proportion of the data in order to optimize some statistic, the remaining data no longer represent the population in any way that would be correctly analyzed using standard statistical procedures (that is, those which assume your data are a random sample). Specifically, all confidence intervals, prediction intervals, and p-values would be erroneous--and perhaps extremely so when as much as 10% of the data are removed."
+
+Outliers can be removed manually based on visualization or based on the data point's distance from the Inter-Quartile Range. They can also be removed by percentage (e.g. bottom 10%, top 10%).
+
+[This dataset's author recommends removing the data points with more than 4000 square feet](http://jse.amstat.org/v19n3/decock.pdf) from the data set -- three of them are true outliers (Partial Sales that likely don’t represent actual market values) and two of them are simply unusual sales (very large houses priced relatively appropriately). A plot of SALE PRICE versus GR LIV AREA quickly indicates these points.
+
+```{r}
+plot(SalePrice ~ GrLivArea, data=train, xlab = "Goundfloor Living Area", ylab = "Sale Price", main = "Checking for Outliers")
+```
+
+
+Remove GrLivArea >= 4000 from the dataset.
+
+```{r}
+train <- subset(train, GrLivArea<=4000)
+```
+<span style="color:red">QUESTION: QUESTION: Correct to apply to train not combi? Adding numeric train back to combi did not work. See code below.</span> 
+
+```{r}
+# combi = combi %>% select(-names(train)) %>% cbind(train)
+```
+
+Observe that the new GrLivArea does not include any data points with area greater than 4000 square feet.
+```{r}
+plot(SalePrice ~ GrLivArea, data=train) 
+```
+
+Observe the dataset is now two data points fewer. <span style="color:red">Is this true? How to check to check total number of data points? Not with str().</span>
+```{r}
+str(combi)
+```
+
+We could continue to plot variables and visually search for outliers. <span style="color:red">I don't know how to make this plot, but if someone does, we can add it.</span>
+
+![Plotting Outliers - NOT MY WORK](~/Documents/Programming Projects/Data Sets/house_all/outliers_plot.png)
+[Another student found outliers = {"LotArea": 150000, "BsmtFinSF1": 4000, "TotalBsmtSF": 6000, "1stFlrSF": 4000, "GrLivArea": 5000}](http://www.shihaiyang.me/2018/04/16/house-prices/)
+
+### Remove outliers with IQR
+Filter numeric vars.
+```{r}
+numeric_train <- Filter(is.numeric, subset(combi, dataset == "train"))
+str(numeric_train)
+```
+
+Compute IQR. Note: you could also use the function IQR().
+```{r}
+lowerq = quantile(numeric_train, na.rm = TRUE)[2]
+upperq = quantile(numeric_train, na.rm = TRUE)[4]
+iqr = upperq - lowerq 
+```
+
+Compute the bounds for a mild outlier:
+```{r}
+mild.threshold.upper = upperq + (iqr * 1.5) 
+mild.threshold.lower = lowerq - (iqr * 1.5)
+```
+
+mild outliers
+```{r}
+mild_outliers <- which(numeric_train > mild.threshold.upper | numeric_train < mild.threshold.lower)
+str(mild_outliers)
+```
+
+Compute the bounds for an extreme outlier:
+```{r}
+extreme.threshold.upper = (iqr * 3) + upperq
+extreme.threshold.lower = lowerq - (iqr * 3)
+```
+
+extreme outliers
+```{r}
+extreme_outliers <- which(numeric_train > extreme.threshold.upper | numeric_train < extreme.threshold.lower)
+str(extreme_outliers)
+```
+
+all outliers = mild + extreme outliers
+```{r}
+all_outliers <- which(numeric_train > mild.threshold.upper | numeric_train < mild.threshold.lower)
+str(all_outliers)
+```
+
+Option 1: remove extreme outliers only
+```{r}
+numeric_train <- numeric_train[-extreme_outliers]
+```
+
+Option 2: remove all outliers
+```{r}
+# numeric_train <- numeric_train[-all_outliers]
+```
+
+For now, let's just remove extreme outliers. We can always come back and switch this after testing our linear model.
+
+Determine if outliers were correctly removed. <span style="color:red">Note: str() doesn't actually say anything about whether outliers were removed. What's another way?</span>
+```{r}
+str(numeric_train)
+```
+
+Add numeric train back to combi. 
+
+<span style="color:red">Error in -names(numeric_train) : invalid argument to unary operator.</span>
+```{r}
+# combi = combi %>% select(-names(numeric_train)) %>% cbind(numeric_train)
+```
+
+
+Another method of removing outliers: replace based on percentiles. E.g. remove all bottom 5% and top 95% data points.
+```{r}
+# percSalePrice =quantile(combi$SalePrice,probs = c(.05,.95), na.rm = TRUE)
+# combi = combi %>% 
+#   mutate(SalePrice = ifelse(SalePrice < percSalePrice[1], percSalePrice[1], 
+#                             ifelse(SalePrice > percSalePrice[2], percSalePrice[2], SalePrice)))
+```
+
+## Impute Missing Values 
+
+There are some simple ways to deal with NA's: train[complete.cases(train), ] or
+na.omit(train). But that would remove far too much data. Moreover, this
+data set has many NA's that do not indicate _missing_ data but rather mean “not
+present”. For example, the NA’s in categorical variables like Alley,
+LotFrontage, MasVnrArea, GarageYrBlt. Those NA's should indicate that the
+feature doesn't exist for this observation. But other NAs would be better
+represented as a mean. Still others, would be better replaced with a string
+that indicates "typical". The dataset requires going through each
+variable one by one to determine what kind of replacement is best suited.
+
+```{r}
+head(combi)  
+```
+
+Check NA counts for each column in a dataframe:
+```{r}
+sapply(combi, function(x) sum(is.na(x)))
+```
+
+Replace multiple columns of NAs with most appropriate values. This requires looking at every variable to see what kind of values it has and making a judgment call on how best to replcae the NAs.
+
+Replace NA with "None".
+```{r}
+vars_to_none = c("Alley", "BsmtQual", "BsmtCond", "BsmtExposure", "BsmtFinType1", "BsmtFinSF1", "BsmtFinType2", "FireplaceQu", "GarageType", "GarageYrBlt", "GarageFinish", "GarageQual", "GarageCond", "PoolQC", "Fence", "MiscFeature", "MasVnrType")
+combi[vars_to_none] <- sapply(combi %>% select(vars_to_none), function(x) x = ifelse(is.na(x), "None", x))
+```
+
+Replace NA with mean.
+```{r}
+vars_to_mean = c("LotFrontage", "MasVnrArea", "GarageYrBlt")
+combi[vars_to_mean] <- sapply(combi %>% select(vars_to_mean), function(x) x = ifelse(is.na(x), mean(x, na.rm = T), x))
+```
+
+Replace NA with 0.
+```{r}
+vars_to_zero = c("BedroomAbvGr", "GarageCars", "GarageArea", "BsmtFinSF2", "BsmtUnfSF", "TotalBsmtSF", "BsmtFullBath", "BsmtHalfBath")
+combi[vars_to_zero] <- sapply(combi %>% select(vars_to_zero), function(x) x = ifelse(is.na(x), 0, x))
+```
+
+Replace NA with "Typ".
+```{r}
+vars_to_typ = c("Functional")
+combi[vars_to_typ] <- sapply(combi %>% select(vars_to_typ), function(x) x = ifelse(is.na(x), "Typ", x))
+```
+
+Replace NA with "TA"
+```{r}
+vars_to_ta = c("KitchenQual")
+combi[vars_to_ta] <- sapply(combi %>% select(vars_to_ta), function(x) x = ifelse(is.na(x), "TA", x))
+```
+
+Initially, I was unclear about what to do with NA: MSZoning, Utilities, Exterior1st, Exterior2nd,  Electrical. Their values are not numeric and no not fall into a grading system where they could be assigned "typical". Some of these variables were 99%+ the same value; moreover, the number of NA's was relatively small compared to the observation number. So I decided it was safe to assign these values to the most common value in the column, using a mode function.
+
+
+Create a function to calculate mode, and then use it inside sapply.
+```{r}
+find_mode = function(x){names(which.max(table(x)))}
+```
+
+Replace NA with mode.
+```{r}
+vars_to_mode = c("MSZoning", "Utilities", "Exterior1st", "Exterior2nd",  "Electrical")  
+combi[vars_to_mode] <- sapply(combi %>% select(vars_to_mode), function(x) x = ifelse(is.na(x),find_mode(x), x))
+```
+
+A more concise but slightly less scrutable way of doing this is to define the find_mode function within the sapply function, like this:
+```{r}
+#combi[vars_to_temp] <- sapply(combi %>% select(vars_to_temp), function(x) x = ifelse(is.na(x),names(which.max(table(x))), x))
+```
+
+Check updated dataframe.
+```{r}
+head(combi)
+summary(combi)
+```
+There are no more NA's -- except in the dataset = test rows for SalePrice, which we purposefully left as-is for now, since later our predicition models will replace that column.
+
+The data wrangling portion of this project is complete.
