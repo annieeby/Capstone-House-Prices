@@ -503,7 +503,7 @@ glimpse(train)
 # http://www.shihaiyang.me/2018/04/16/house-prices/
 
 
-####### Linear Regression
+############################### Linear Regression ################################
 
 # R Squared
 # Adjusted R Squared adjusts the R Squared value to account for the number of
@@ -584,10 +584,11 @@ str(train)
 predictTest = predict(fit4, [newdata = train?])
 predictTest
 
+###################################### CART ######################################
 
 
+#-------------------------------- Split Training Data ---------------------------#
 
-#-------------------------- Cross validation ------------------------#
 # See Analytics Edge Unit 3, Modeling the Expert
 
 library(caTools)
@@ -597,10 +598,13 @@ set.seed(88)
 split = sample.split(train$SalePrice, SplitRatio = 0.75)
 split
 
-# Create training and testing sets
+# Create training and testing sets (Q: Does this boolean split apply for non-logistic-regression?)
 qualityTrain = subset(quality, split == TRUE)
 qualityTest = subset(quality, split == FALSE)
 
+#--------------------------------- rpart Model ---------------------------------#
+
+SalesTree <- rpart(SalePrice ~ [TBD_variable + TBD_variable + TBD_variable])
 
 # Step function:
 # R provides a function, step, that will automate the procedure of trying different combinations of variables to find a good compromise of model simplicity and R2. This trade-off is formalized by the Akaike information criterion (AIC) - it can be informally thought of as the quality of the model with a penalty for the number of variables in the model.
