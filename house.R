@@ -586,6 +586,7 @@ predictTest
 
 ###################################### CART ######################################
 
+# CART stands for Classification and Regression Trees.
 
 #-------------------------------- Split Training Data ---------------------------#
 
@@ -599,12 +600,12 @@ split = sample.split(train$SalePrice, SplitRatio = 0.75)
 split
 
 # Create training and testing sets (Q: Does this boolean split apply for non-logistic-regression?)
-qualityTrain = subset(quality, split == TRUE)
-qualityTest = subset(quality, split == FALSE)
+saleTrain = subset(train, split == TRUE)
+saleTest = subset(train, split == FALSE)
 
 #--------------------------------- rpart Model ---------------------------------#
 
-SalesTree <- rpart(SalePrice ~ [TBD_variable + TBD_variable + TBD_variable])
+SalesTree <- rpart(SalePrice ~ TBD_variable + TBD_variable + TBD_variable, data = saleTrain)
 
 # Step function:
 # R provides a function, step, that will automate the procedure of trying different combinations of variables to find a good compromise of model simplicity and R2. This trade-off is formalized by the Akaike information criterion (AIC) - it can be informally thought of as the quality of the model with a penalty for the number of variables in the model.
