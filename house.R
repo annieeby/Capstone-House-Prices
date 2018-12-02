@@ -586,7 +586,10 @@ predictTest
 
 ###################################### CART ######################################
 
-# CART stands for Classification and Regression Trees.
+# CART stands for Classification and Regression Trees. The CART model is
+# competitive with logistic regression in terms of accuracy but it is much more
+# interpretable because we can see how it "makes decisions". This solves the 
+# blackbox / inscrutability problem of some machine learning processes.
 
 #-------------------------------- Split Training Data ---------------------------#
 
@@ -605,8 +608,22 @@ saleTest = subset(train, split == FALSE)
 
 #--------------------------------- rpart Model ---------------------------------#
 
-SalesTree <- rpart(SalePrice ~ TBD_variable + TBD_variable + TBD_variable, data = saleTrain)
+SalesTree <- rpart(SalePrice ~ TBD_variable + TBD_variable + TBD_variable, data = saleTrain, method = TBD) #[metod = class for boolean; what use here?], minbucket = [])
 
+# visualize tree
+prp(SalesTree)
+
+# predict outcome
+PredictCART <- predict(SalesTree, newdata = saleTest, type = "class") #type "class" is like having a threshold of .5
+
+# get accuracy of model by building a confusion matrix. First argument is true outcome from test set, second argument is our prediction.
+table(saleTest$SalePrice, PredictCART)
+
+# get accuracy by adding correct prediction and dividing by total number of observations in the test set
+
+
+
+                     
 # Step function:
 # R provides a function, step, that will automate the procedure of trying different combinations of variables to find a good compromise of model simplicity and R2. This trade-off is formalized by the Akaike information criterion (AIC) - it can be informally thought of as the quality of the model with a penalty for the number of variables in the model.
 
