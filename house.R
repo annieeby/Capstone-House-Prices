@@ -71,7 +71,7 @@ combi = bind_rows(train %>% mutate(dataset = 'train'),
 # Observe the structure of the combined dataframe.
 str(combi)
 
-
+##################################################################################
 ################################### Remove Outliers ##############################
 
 # For linear regression to be effective, the model must be robust to outliers.
@@ -113,27 +113,12 @@ plot(SalePrice ~ GrLivArea, data=train)
 #Observe the dataset is now two observations fewer. <span style="color:red">Check previously: [ ]</span>
 str(combi)
 
-# To continue removing outliers, we can remove values that outside of the 1.5 * IQR.
-#<span style="color:red">Question: some users said removing all data points outside the 1.5 * IQR range removed _too many_ outliers. How do I determine the appropriate number of outliers?</span>
-
-#?boxplot.stats
-#outliersValue<- boxplot.stats(train$SalePrice)$out
-#train$SalePrice[!train$SalePrice %in% outliersValue]
-
-
-# Another way we could do it is to remove outliers based on their distance from the IQR
-
 ##################################################################################
-##################################################################################
+
 # Filter numeric vars:
 numeric_train <- Filter(is.numeric, subset(combi, dataset == "train"))
 str(numeric_train)
 
-# Note: if that doesn't work try
-# combi_train <- combi[combi$dataset == "train", ]
-# numeric_train <- Filter(is.numeric, combi_train)
-
-##################################################################################
 ##################################################################################
 
 # Compute IQR; could also use the function IQR() 
@@ -292,15 +277,19 @@ head(combi$GarageGrade)
 
 # Overall quality of the exterior
 combi$ExterGrade <- combi$ExterQual * combi$ExterCond
+head(combi$ExterGrade)
 
 # Overall kitchen score
 combi$KitchenScore <- combi$KitchenAbvGr * combi$KitchenQual
+head(combi$KitchenScore)
 
 # Overall fireplace score
 combi$FireplaceScore <- combi$Fireplaces * combi$FireplaceQu
+head(combi$FireplaceScore)
 
 # Overall garage score
 combi$GarageScore <- combi$GarageArea * combi$GarageQual
+head(combi$GarageScore)
 
 # Overall pool score
 combi$PoolScore <- combi$PoolArea * combi$PoolQC
@@ -339,7 +328,7 @@ combi$AllPorchSF <- combi$OpenPorchSF + combi$EnclosedPorch +
 
 ########################### Transform Skewed Attributes ##########################
 
-# Regression techniques require a normal distribution. <span style="color:red">[Insert why this is.]</span>
+# Regression techniques require a normal distribution. 
 # A histogram plot shows the distribution of the target variable ‘SalePrice’ as
 # being was right-skewed. A "skewed right" distribution is one in which the tail
 # is on the right side. Most sales prices are on the low side of the scale and
@@ -369,7 +358,7 @@ hist(combi$TotalBath)
 combi$TotalBath <- log1p(combi$TotalBath)
 hist(combi$TotalBath)
 
-########################### ASK STACK OVERFLOW ####################
+########################### ASK HOW TO VIEW MULTIPLE ####################
 
 # View all numeric variable distributions
 
@@ -409,6 +398,7 @@ sapply(combi %>% filter(is.numeric, x), function(x)
 # Examples:
 # Ground floor living area and Sale price are correlated at 0.7205163
 cor(train$GrLivArea, train$SalePrice)
+
 # All correlations (numeric only)
 cor(numeric_train)
 
@@ -424,14 +414,14 @@ cor(numeric_train)
 # between each independent variable and the dependent variable independently because the 
 # independent variables tend to change in unison. 
 
-# To check for multicollinearity, I created a
+# To check for multicollinearity, I will create a
 # correlation matrix with respect to the target variable ‘SalePrice’. Some
 # variables are highly correlated such as [TBD - e.g. GarageArea and GarageCars].  This
 # makes sense because [TBD -e.g. the size of a garage determines('GarageArea') the number 
 # of cars that fit in it ('GarageCars')]. Other highly correlated variables show similar 
 # dependency.
 
-
+############################### Problematic Code Start ###############################
 
 forcorrplot <- cor(numeric_train)
 corrplot(forcorrplot, method="color")
@@ -485,8 +475,8 @@ names(combi)
 #-------------------------- Remove Correlated Attributes ------------------------#
 
 # The correlation matrices reveal attribute pairs whose correlation values are
-# more than <span style="color:red">[0.TBD]</span>. These attributes can be
-# dropped as well. <span style="color:red">[Insert reason]</span>
+# more than ... These attributes can be
+# dropped as well. 
 
 
 #-------------------------Remove Non-Normal Distributions------------------------#
@@ -596,6 +586,20 @@ predictTest
 
 
 
+
+#-------------------------- Cross validation ------------------------#
+# See Analytics Edge Unit 3, Modeling the Expert
+
+library(caTools)
+
+# Randomly split data
+set.seed(88)
+split = sample.split(train$SalePrice, SplitRatio = 0.75)
+split
+
+# Create training and testing sets
+qualityTrain = subset(quality, split == TRUE)
+qualityTest = subset(quality, split == FALSE)
 
 
 # Step function:
