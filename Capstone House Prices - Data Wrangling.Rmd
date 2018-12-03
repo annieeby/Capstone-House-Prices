@@ -1,6 +1,6 @@
 ---
 title: "House Prices Wrangling Report"
-author: "Annie"
+author: "Annie Eby"
 date: "12/2/2018"
 output:
   pdf_document: default
