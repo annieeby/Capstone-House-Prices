@@ -1,0 +1,43 @@
+---
+title: "House Prices Wrangling Report"
+author: "Annie"
+date: "12/2/2018"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+The data is already tidy, with all columns as variables (contains all values that measure the same attribute across units), all rows as observations (contains all values measured on the same unit across attributes), and one type of observational unit per table
+
+
+## Combine Dataframes 
+
+In order to manipulate the variables without ruining parity between the two data sets, I concatenated the train and test sets by making a new dataframe called “combi” with all the same rows as the original two datasets, stacked in the order in which we specified: train first, and test second.
+
+I used bind_rows(), which automatically creates new columns with NA values, as needed. Using the pipe operator and mutate function, I added a new column, combi$dataset, with values 'train' and 'test' to make it easier to track and split the variable later.
+
+## Remove Outliers 
+
+Outliers can be removed manually based on visualization or based on the data point's distance from the Inter-Quartile Range. They can also be removed by percentage (e.g. bottom 10%, top 10%).
+
+Using IQR, I created two thresholds, an extreme outliers case of 1st quartile - IQR x 3 / 3rd quartile + IQR x 3 and a mild outliers case, which has the same formula but multiplied by the more standard 1.5 rather than 3. (This is how outliers are determined with boxplots.)
+
+I removed outliers only from the training set, not the combined set, so when it was done, I updated the combined set with the new training set minus the outliers.
+
+## Impute Missing Values 
+
+There are some simple ways to deal with NA's: train[complete.cases(train), ] or
+na.omit(train). But that would remove far too much data. Moreover, this
+data set has many NA's that do not indicate _missing_ data but rather mean “not
+present”. For example, the NA’s in categorical variables like Alley,
+LotFrontage, MasVnrArea, GarageYrBlt. Those NA's should indicate that the
+feature doesn't exist for this observation. But other NAs would be better
+represented as a mean. Still others, would be better replaced with a string
+that indicates "typical". The dataset requires going through each
+variable one by one to determine what kind of replacement is best suited.
+
+Initially, I was unclear about what to do with NA: MSZoning, Utilities, Exterior1st, Exterior2nd,  Electrical. Their values are not numeric and no not fall into a grading system where they could be assigned "typical". Some of these variables were 99%+ the same value; moreover, the number of NA's was relatively small compared to the observation number. So I decided it was safe to assign these values to the most common value in the column, using a mode function.
+
+In the future, as a matter of method systemization, I would probably impute missing values before removing outliers, though I don't believe it makes a difference in this case.
+
+I left NA's in SalePrice, since the predicition model will replace that column later.
