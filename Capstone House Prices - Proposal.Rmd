@@ -2,7 +2,9 @@
 title: "Capstone Project Proposal"
 author: "Annie Eby"
 date: "11/27/2018"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 
@@ -21,6 +23,8 @@ Housing price prediction provides valuable information. More than ensuring buyer
 
 House pricing predictions will be made from 1460 observations of 79 explanatory variables describing aspects of residential homes in Ames, Iowa. The [Ames Housing Dataset](https://www.kaggle.com/c/house-prices-advanced-regression-techniques/data) using was compiled by Dean De Cock for use in data science education; it is a modernized and expanded version of the often cited Boston Housing dataset. 
 
+The complete data set contains 2919 observations, 80 explanatory, or independent, variables [(23 nominal, 23 ordinal, 14 discrete, and 20 continuous)], and one dependent variable, SalePrice. Our goal is to predict SalePrice in the test set, using a training set of 1460 sold homes and their information across 80 dependent variables. These 1460 sold homes contain common information like lot size in square feet, type of road access to property, type of utilities available, and above grade (ground) living area square feet. Some of these variables are clearly correlated, like slope of the property and flatness of the property, or size of garage in car capacity and size of garage in square feet. Some variables are more qualitiative like overall material and finish of the house, and kitchen quality. Some get quite technical, like masonry veneer type, and quite specific, like three season porch area in square feet. [A full description of the data is linked here.](https://github.com/annieeby/Capstone-House-Prices/blob/master/data_description.txt)
+
 ### Analysis Approach
 
 The analysis will include feature engineering and advanced regression techniques like random forest and gradient boosting. Regression is a machine learning tool that helps you make predictions by learning – from the existing statistical data – the relationships between the target parameter, the sale price, and a set of other parameters. Given enough data, the relationship between the target parameter of sale price (the output) and other parameters (the input), this relationship function can be applied to the test data to predict sale prices.
@@ -28,4 +32,11 @@ The analysis will include feature engineering and advanced regression techniques
 ### Deliverables
 
 The primary deliverables are the code used to execute the analysis and predict the house prices. I will also deliver a paper which will communicate the analysis process and the findings. The paper will be targeted for real estate professionals and city officials in Ames, Iowa. All final deliverables, as well as intermediate deliverables, will be made available on the project's [GitHub Repository](https://github.com/annieeby/Capstone-House-Prices).
+
+### Resources
+Ames, Iowa: Alternative to the Boston Housing Data as an
+End of Semester Regression Project
+Dean De Cock
+Truman State University
+Journal of Statistics Education Volume 19, Number 3(2011), [www.amstat.org/publications/jse/v19n3/decock.pdf](http://jse.amstat.org/v19n3/decock.pdf)
 
